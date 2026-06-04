@@ -192,3 +192,44 @@ Navigate to your web browser:
 | **Header Exposure** | Basic Auth credentials (`Authorization: Basic ...`) and API keys are transmitted as plain strings. | Headers and query arguments are wrapped in the TLS layer, protecting them from sniffers. |
 | **Browser Indicator** | Displays "Not Secure" warning in the browser address bar. | Displays a padlock icon (🔒) indicating the connection is verified and encrypted. |
 | **Sandbox Sim Impact** | Turning the **Secure Cookie Flag** toggle **ON** causes the browser to reject the cookie, logging you out immediately. | If running on HTTPS, turning the **Secure Cookie Flag** toggle **ON** works seamlessly, protecting the session. |
+
+---
+
+## 9. Recommended Git Commit Flow (Modular Stages)
+
+To maintain a clean, readable Git history during this transition, commit changes incrementally using Conventional Commit messages:
+
+### Stage 0: Project Environment & Gitignore
+```bash
+git add pyproject.toml uv.lock .gitignore && git commit -m "chore: configure project dependencies and database exclusions in gitignore"
+```
+
+### Stage 1: Logging Infrastructure & Config
+```bash
+git add session_profile_app/core/__init__.py session_profile_app/core/config.py session_profile_app/core/logging.py && git commit -m "feat(core): add configuration parameters and structured JSON & plaintext logger handlers"
+```
+
+### Stage 2: Database & Cryptographic Security
+```bash
+git add session_profile_app/core/database.py session_profile_app/core/security.py session_profile_app/core/session.py && git commit -m "feat(core): add database engine factories, PBKDF2 helpers, and session managers"
+```
+
+### Stage 3: Models & Request Validation Schemas
+```bash
+git add session_profile_app/models/ session_profile_app/schemas/ && git commit -m "feat(data): define database entities and validation schemas"
+```
+
+### Stage 4: API Domain Controllers
+```bash
+git add session_profile_app/api/ && git commit -m "feat(api): modularize auth, profile, and debug endpoint routers"
+```
+
+### Stage 5: Entrypoint Refactor & Purge Legacy Files
+```bash
+git add session_profile_app/main.py && git add -u && git commit -m "refactor: clean up FastAPI main.py entrypoint and purge legacy root files"
+```
+
+### Stage 6: Frontend Controls, Tests & Documentation
+```bash
+git add session_profile_app/verify_session_app.py session_profile_app/industry_logging.md session_profile_app/static/ session_profile_app/README.md && git commit -m "docs: add challenge auth UI toggle, test suite, and architectural guides"
+```
