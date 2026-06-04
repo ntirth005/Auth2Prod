@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth2Prod - Profile & Session Lifecycle App</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <span class="logo-icon">👤</span>
+                <h1>Session & Profile Hub <span class="logo-sub">Production Sandbox</span></h1>
+            </div>
+            <div class="header-actions">
+                <button id="reset-db-btn" class="btn btn-danger">Reset Sandbox DB</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid -->
+        <main class="workspace">
+            
+            <!-- Left Panel: Client Viewport -->
+            <section class="panel client-panel">
+                <!-- Anonymous Phase: Auth Forms -->
+                <div id="auth-container" class="auth-box">
+                    <div class="auth-tabs">
+                        <button id="tab-login-btn" class="auth-tab-btn active">Log In</button>
+                        <button id="tab-register-btn" class="auth-tab-btn">Register</button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form id="login-form" class="auth-form form-grid">
+                        <h3>Welcome Back</h3>
+                        <p class="auth-desc">Log in using your registered credentials to establish a secure database-backed session.</p>
+                        <div class="input-group">
+                            <label for="login-auth-mode">Authentication Protocol Mode</label>
+                            <select id="login-auth-mode" style="width: 100%;">
+                                <option value="standard">Standard Flow (Plaintext password transmitted)</option>
+                                <option value="cryptographic">Zero-Transmission Flow (Client-side hashed handshake)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="login-username">Username</label>
+                            <input type="text" id="login-username" placeholder="e.g. bob" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" placeholder="••••••••" required>
+                        </div>
+                        <div class="input-group-checkbox">
+                            <input type="checkbox" id="login-secure-cookie">
+                            <label for="login-secure-cookie">🔒 Enable HTTPS-Only Cookie (Secure Flag)</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">Authenticate & Sessionize</button>
+                    </form>
+
+                    <!-- Register Form -->
+                    <form id="register-form" class="auth-form form-grid hidden">
+                        <h3>Create Account</h3>
+                        <p class="auth-desc">Register a new profile. Your password will be salted and hashed via PBKDF2-SHA256.</p>
+                        <div class="input-group">
+                            <label for="reg-username">Username</label>
+                            <input type="text" id="reg-username" placeholder="e.g. bob" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-display-name">Display Name</label>
+                            <input type="text" id="reg-display-name" placeholder="Bob Jones">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-email">Email Address</label>
+                            <input type="email" id="reg-email" placeholder="bob@example.com">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-bio">Short Bio</label>
+                            <input type="text" id="reg-bio" placeholder="Full-stack engineer...">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-password">Password</label>
+                            <input type="password" id="reg-password" placeholder="Min. 6 characters" required>
+                        </div>
+                        <button type="submit" class="btn btn-success btn-full">Register Profile</button>
+                    </form>
+                </div>
+
+                <!-- Authenticated Phase: Dashboard Profile Manager -->
+                <div id="profile-container" class="profile-box hidden">
+                    <div class="profile-header-card">
+                        <div class="avatar-ring">👤</div>
+                        <div>
+                            <h2 id="greet-name">Hello, User</h2>
+                            <p id="greet-username">@username</p>
+                        </div>
+                        <button id="logout-btn" class="btn btn-danger btn-sm logout-header-btn">Log Out</button>
+                    </div>
+
+                    <!-- Profile Edit Form -->
+                    <div class="card form-card">
+                        <h3>Modify Profile Fields</h3>
+                        <p class="card-desc">These columns exist in the SQLite <code>users</code> table. Any change will write to the DB inside your active session context.</p>
+                        <form id="profile-update-form" class="form-grid">
+                            <div class="input-group">
+                                <label for="profile-display-name">Display Name</label>
+                                <input type="text" id="profile-display-name" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="profile-email">Email Address</label>
+                                <input type="email" id="profile-email">
+                            </div>
+                            <div class="input-group">
+                                <label for="profile-bio">Bio</label>
+                                <input type="text" id="profile-bio">
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Save Changes</button>
+                        </form>
+                    </div>
+
+                    <!-- Password Rotation Form -->
+                    <div class="card form-card">
+                        <h3>Rotate Password</h3>
+                        <p class="card-desc">Changing your password invalidates all other active sessions for security, preserving only your current session.</p>
+                        <form id="password-change-form" class="form-grid">
+                            <div class="input-group">
+                                <label for="pwd-current">Current Password</label>
+                                <input type="password" id="pwd-current" placeholder="••••••••" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="pwd-new">New Password</label>
+                                <input type="password" id="pwd-new" placeholder="••••••••" required>
+                            </div>
+                            <button type="submit" class="btn btn-warning btn-full">Change Password</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: DB State & Active Session Diagnostics -->
+            <section class="panel server-panel">
+                <div class="panel-header">
+                    <h2>⚙️ Sandbox Storage & Diagnostics</h2>
+                    <span class="badge badge-server">Server State</span>
+                </div>
+
+                <!-- Session Cookie HUD -->
+                <div class="card state-card flex-shrink-0">
+                    <h3>Client Cookie HUD</h3>
+                    <p class="card-desc">Exposes raw browser-attached cookie payloads and their resolution properties.</p>
+                    <div class="cookie-debugger-grid">
+                        <div class="debugger-item">
+                            <strong>Cookie Found:</strong>
+                            <span id="cookie-status-badge" class="hud-status status-red">NO COOKIE</span>
+                        </div>
+                        <div class="debugger-item break-word">
+                            <strong>Raw Session Cookie:</strong>
+                            <code id="cookie-raw-val" class="break-word">None</code>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SQLite DB Inspector -->
+                <div class="card state-card flex-shrink-0" style="margin-top: 1rem;">
+                    <div class="state-card-header">
+                        <h3>SQLite Tables Monitor</h3>
+                        <button id="refresh-state-btn" class="btn btn-secondary btn-sm">🔄 Refresh State</button>
+                    </div>
+                    <div class="state-grid">
+                        <!-- Users Table -->
+                        <div class="state-bucket">
+                            <h4>users Table</h4>
+                            <div class="scroll-box" id="users-list">
+                                <div class="empty-state">No database records</div>
+                            </div>
+                        </div>
+
+                        <!-- Sessions Table -->
+                        <div class="state-bucket">
+                            <h4>session_records Table</h4>
+                            <div class="scroll-box" id="sessions-list">
+                                <div class="empty-state">No active sessions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Traffic Console -->
+                <div class="card network-card flex-grow-1" style="margin-top: 1rem;">
+                    <div class="network-header">
+                        <h3>Client-Server Interactions</h3>
+                        <button id="clear-logs-btn" class="btn btn-secondary btn-sm">Clear Transactions</button>
+                    </div>
+                    <div class="network-timeline" id="network-timeline">
+                        <div class="empty-network">No interactions captured yet. Perform an action on the client workspace.</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
