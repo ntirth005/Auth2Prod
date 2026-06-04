@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth2Prod - Authentication Systems Visualizer</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <span class="logo-icon">🔐</span>
+                <h1>Auth2Prod <span class="logo-sub">Diagnostic Workspace</span></h1>
+            </div>
+            <div class="header-actions">
+                <button id="reset-db-btn" class="btn btn-danger">Reset Server Database</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            
+            <!-- Left Side: Client Control Center -->
+            <section class="panel client-panel">
+                <div class="panel-header">
+                    <h2>🖥️ Client Workspace</h2>
+                    <span class="badge badge-client">Client-Side</span>
+                </div>
+
+                <!-- Registration Card -->
+                <div class="card registration-card">
+                    <h3>Create Test User</h3>
+                    <p class="card-desc">Registers a user. Computes standard bcrypt hash and a precomputed MD5 HA1 hash (for Digest Auth).</p>
+                    <form id="register-form" class="form-grid">
+                        <div class="input-group">
+                            <label for="reg-username">Username</label>
+                            <input type="text" id="reg-username" placeholder="e.g. alice" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-password">Password</label>
+                            <input type="password" id="reg-password" placeholder="••••••••" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">Register User</button>
+                    </form>
+                </div>
+
+                <!-- Auth Methods Control -->
+                <div class="card auth-methods-card">
+                    <h3>Authentication Methods</h3>
+                    
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="basic">Basic</button>
+                        <button class="tab-btn" data-tab="digest">Digest</button>
+                        <button class="tab-btn" data-tab="apikey">API Key</button>
+                        <button class="tab-btn" data-tab="session">Session</button>
+                    </div>
+
+                    <!-- Tab Contents -->
+                    <div class="tab-content active" id="tab-basic">
+                        <h4>HTTP Basic Authentication</h4>
+                        <p class="tab-desc">Sends credentials base64-encoded in the <code>Authorization: Basic &lt;blob&gt;</code> header.</p>
+                        
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label for="basic-username">Username</label>
+                                <input type="text" id="basic-username" placeholder="alice">
+                            </div>
+                            <div class="input-group">
+                                <label for="basic-password">Password</label>
+                                <input type="password" id="basic-password" placeholder="••••••••">
+                            </div>
+                            <button id="btn-basic-submit" class="btn btn-success btn-full">Send Request (Basic Auth)</button>
+                        </div>
+
+                        <div class="spec-info">
+                            <h5>How it works:</h5>
+                            <ul>
+                                <li>Client hashes: <code>b64encode(username + ":" + password)</code></li>
+                                <li>Sends header: <code class="break-word">Authorization: Basic YWxpY2U6cGFzc3dvcmQ=</code></li>
+                                <li><strong>Stateless:</strong> Every single request must include this header.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-digest">
+                        <h4>HTTP Digest Authentication (RFC 2617)</h4>
+                        <p class="tab-desc">Challenge-response scheme. Server challenges with a nonce. Client responds with MD5 hashes, protecting the password from wire-sniffing.</p>
+                        
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label for="digest-username">Username</label>
+                                <input type="text" id="digest-username" placeholder="alice">
+                            </div>
+                            <div class="input-group">
+                                <label for="digest-password">Password</label>
+                                <input type="password" id="digest-password" placeholder="••••••••">
+                            </div>
+                            <button id="btn-digest-submit" class="btn btn-success btn-full">Send Request (Digest Auth)</button>
+                        </div>
+
+                        <div class="spec-info">
+                            <h5>Double Request Handshake:</h5>
+                            <ol>
+                                <li>Client requests <code>/auth/digest/protected</code> without auth.</li>
+                                <li>Server replies with <strong>401 Unauthorized</strong> & <code>WWW-Authenticate: Digest realm="...", nonce="..."</code></li>
+                                <li>Client calculates MD5 hashes using the nonce, realm, and password.</li>
+                                <li>Client sends secondary request with <code>Authorization: Digest username="...", response="..."</code></li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-apikey">
+                        <h4>API Key Authentication</h4>
+                        <p class="tab-desc">Header-based token auth. Use Basic credentials to generate an API key, then use the key to authenticate.</p>
+                        
+                        <div class="api-key-actions">
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label for="apikey-gen-username">Auth Username</label>
+                                    <input type="text" id="apikey-gen-username" placeholder="Username (to authenticate generation)">
+                                </div>
+                                <div class="input-group">
+                                    <label for="apikey-gen-password">Auth Password</label>
+                                    <input type="password" id="apikey-gen-password" placeholder="Password">
+                                </div>
+                                <button id="btn-apikey-generate" class="btn btn-primary btn-full">Generate API Key</button>
+                            </div>
+
+                            <div id="generated-key-container" class="generated-key-box hidden">
+                                <strong>Your New API Key (Save it!):</strong>
+                                <code id="generated-key-value">ap_...</code>
+                            </div>
+
+                            <hr class="divider">
+
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label for="apikey-value">API Key to Use</label>
+                                    <input type="text" id="apikey-value" placeholder="ap_...">
+                                </div>
+                                <button id="btn-apikey-submit" class="btn btn-success btn-full">Send Request (API Key)</button>
+                            </div>
+                        </div>
+
+                        <div class="spec-info">
+                            <h5>How it works:</h5>
+                            <ul>
+                                <li>Client sends key in custom header: <code>X-API-Key: ap_xyz...</code></li>
+                                <li>Server hashes key via SHA-256 and checks database.</li>
+                                <li>Commonly used for Machine-to-Machine (M2M) communication.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-session">
+                        <h4>Cookie-Based Session Authentication</h4>
+                        <p class="tab-desc">Stateful authentication. Server validates credentials once, saves session state, and returns a session cookie. Browser automatically sends cookies on subsequent requests.</p>
+                        
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label for="session-username">Username</label>
+                                <input type="text" id="session-username" placeholder="alice">
+                            </div>
+                            <div class="input-group">
+                                <label for="session-password">Password</label>
+                                <input type="password" id="session-password" placeholder="••••••••">
+                            </div>
+                            <div class="input-group">
+                                <label for="session-store-type">Session Storage Type</label>
+                                <select id="session-store-type">
+                                    <option value="memory">In-Memory Store (Process-bound)</option>
+                                    <option value="db">SQLite Database Store (Shared State)</option>
+                                </select>
+                            </div>
+                            <div class="btn-group">
+                                <button id="btn-session-login" class="btn btn-primary">Login & Set Session</button>
+                                <button id="btn-session-logout" class="btn btn-danger">Logout</button>
+                            </div>
+                            <button id="btn-session-submit" class="btn btn-success btn-full">Send Request (Access Protected)</button>
+                        </div>
+
+                        <div class="spec-info">
+                            <h5>Stateful session lifecycle:</h5>
+                            <ul>
+                                <li><strong>Login:</strong> Server validates credentials, generates random session ID, records it in the store, and returns <code>Set-Cookie: auth2prod_session_id=...</code></li>
+                                <li><strong>Requests:</strong> Browser automatically attaches <code>Cookie: auth2prod_session_id=...</code></li>
+                                <li><strong>Scale problem:</strong> In-Memory stores fail when requests go to different server instances. Database/Redis stores solve this by centralizing state.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Side: Server State & Network Logs -->
+            <section class="panel server-panel">
+                <div class="panel-header">
+                    <h2>⚙️ Server State & Network Logs</h2>
+                    <span class="badge badge-server">Server-Side</span>
+                </div>
+
+                <!-- Database State Card -->
+                <div class="card state-card">
+                    <div class="state-card-header">
+                        <h3>Server Storage State</h3>
+                        <button id="refresh-state-btn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+                    </div>
+                    
+                    <div class="state-grid">
+                        <!-- Users -->
+                        <div class="state-bucket">
+                            <h4>Registered Users (SQLite)</h4>
+                            <div class="scroll-box" id="users-list">
+                                <div class="empty-state">No users registered yet</div>
+                            </div>
+                        </div>
+
+                        <!-- API Keys -->
+                        <div class="state-bucket">
+                            <h4>Active API Keys (SQLite)</h4>
+                            <div class="scroll-box" id="apikeys-list">
+                                <div class="empty-state">No API Keys generated</div>
+                            </div>
+                        </div>
+
+                        <!-- Sessions (DB) -->
+                        <div class="state-bucket">
+                            <h4>Sessions in Database (SQLite)</h4>
+                            <div class="scroll-box" id="db-sessions-list">
+                                <div class="empty-state">No active DB sessions</div>
+                            </div>
+                        </div>
+
+                        <!-- Sessions (In-Memory) -->
+                        <div class="state-bucket">
+                            <h4>Sessions in Memory (RAM)</h4>
+                            <div class="scroll-box" id="memory-sessions-list">
+                                <div class="empty-state">No active in-memory sessions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Log Console -->
+                <div class="card network-card">
+                    <div class="network-header">
+                        <h3>HTTP Traffic Logs</h3>
+                        <button id="clear-logs-btn" class="btn btn-secondary btn-sm">Clear Logs</button>
+                    </div>
+                    
+                    <div class="network-timeline" id="network-timeline">
+                        <div class="empty-network">No network requests sent yet. Use the client controls to trigger requests.</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>
