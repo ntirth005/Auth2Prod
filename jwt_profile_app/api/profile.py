@@ -1,27 +1,27 @@
 import secrets
-import hashlib
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from session_profile_app.core.database import get_db
-from session_profile_app.models.models import User, SessionRecord
-from session_profile_app.schemas.schemas import (
+from jwt_profile_app.core.database import get_db
+from jwt_profile_app.models.models import User, RefreshToken
+from jwt_profile_app.schemas.schemas import (
     ProfileUpdate, PasswordChange, UserResponse
 )
-from session_profile_app.core.security import hash_password, verify_password
-from session_profile_app.core.session import DatabaseSessionManager
-from session_profile_app.core.logging import get_logger
-from session_profile_app.core.config import settings
+from jwt_profile_app.core.security import hash_password, verify_password
+from jwt_profile_app.core.logging import get_logger
+from jwt_profile_app.core.config import settings
 from .utils import get_current_user, capture_debug_meta
 
 router = APIRouter()
-logger = get_logger("session_profile_app")
+logger = get_logger("jwt_profile_app")
 
 @router.get("/api/profile")
 async def get_profile(request: Request, user: User = Depends(get_current_user)):
+    auth_header = request.headers.get("Authorization", "")
+    token_pref = auth_header.split(" ")[1][:8] + "..." if " " in auth_header else "None"
+    
     db_queries = [
-        f"SELECT * FROM session_records WHERE session_id = '{request.cookies.get(settings.SESSION_COOKIE_NAME)[:6]}...'",
-        f"SELECT * FROM users WHERE id = {user.id}"
+        f"SELECT * FROM users WHERE id = {user.id} (Stateless check completed via Token: {token_pref})"
     ]
     debug_meta = await capture_debug_meta(request, db_queries)
     return {
@@ -67,26 +67,33 @@ async def change_password(request: Request, pwd_in: PasswordChange, user: User =
         )
         
     user.hashed_password = hash_password(pwd_in.new_password)
-    user.salt = secrets.token_hex(16)
-    user.client_key = hashlib.sha256((pwd_in.new_password + user.salt).encode('utf-8')).hexdigest()
     db.commit()
-    db_queries.append(f"UPDATE users SET hashed_password='...', salt='...', client_key='...' WHERE id={user.id}")
+    db_queries.append(f"UPDATE users SET hashed_password='...' WHERE id={user.id}")
 
-    # Log out of other sessions to increase security
-    session_mgr = DatabaseSessionManager(db)
-    current_session = request.cookies.get(settings.SESSION_COOKIE_NAME)
-    
-    # Invalidate all sessions except the current one
-    db.query(SessionRecord).filter(
-        SessionRecord.user_id == user.id,
-        SessionRecord.session_id != current_session
-    ).delete()
+    # Identify the current session's refresh token JTI so we don't revoke it,
+    # maintaining parity with the stateful session cookie app which keeps the current session alive.
+    from jwt_profile_app.core.jwt_helper import decode_token
+    current_refresh_token = request.cookies.get(settings.REFRESH_TOKEN_COOKIE_NAME)
+    current_jti = None
+    if current_refresh_token:
+        try:
+            payload = decode_token(current_refresh_token)
+            current_jti = payload.get("jti")
+        except Exception:
+            pass
+
+    # Revoke all other refresh tokens for the user in the database
+    query = db.query(RefreshToken).filter(RefreshToken.user_id == user.id)
+    if current_jti:
+        query = query.filter(RefreshToken.token_jti != current_jti)
+    query.update({"is_revoked": True})
     db.commit()
+    
     logger.info("Password rotated successfully; other active sessions invalidated", extra={"extra_fields": {"username": user.username, "user_id": user.id}})
-    db_queries.append(f"DELETE FROM session_records WHERE user_id={user.id} AND session_id != current_session")
+    db_queries.append(f"UPDATE refresh_tokens SET is_revoked = True WHERE user_id={user.id} AND token_jti != '{current_jti[:8] if current_jti else 'None'}...'")
 
     debug_meta = await capture_debug_meta(request, db_queries)
     return {
-        "message": "Password updated successfully! Other active sessions invalidated.",
+        "message": "Password updated successfully! Other active sessions and devices have been logged out.",
         "debug": debug_meta
     }
