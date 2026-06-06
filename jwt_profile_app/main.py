@@ -2,19 +2,21 @@ import uuid
 from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 
-from session_profile_app.core.database import engine, Base
-from session_profile_app.core.logging import get_logger, request_id_var
-from session_profile_app.api.auth import router as auth_router
-from session_profile_app.api.profile import router as profile_router
-from session_profile_app.api.debug import router as debug_router
+
+from jwt_profile_app.core.database import engine, Base
+from jwt_profile_app.core.logging import get_logger, request_id_var
+from jwt_profile_app.api.auth import router as auth_router
+from jwt_profile_app.api.profile import router as profile_router
+from jwt_profile_app.api.debug import router as debug_router
 
 # Create database tables automatically
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Stateful User Session & Profile Management App")
+app = FastAPI(title="Stateless JWT Profile & Session App")
 
-logger = get_logger("session_profile_app")
+logger = get_logger("jwt_profile_app")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -46,5 +48,10 @@ app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(debug_router)
 
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/static/index.html")
+
 # Mount frontend assets
-app.mount("/static", StaticFiles(directory="session_profile_app/static"), name="static")
+app.mount("/static", StaticFiles(directory="jwt_profile_app/static"), name="static")
+
