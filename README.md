@@ -324,6 +324,42 @@ The objective is to develop engineering judgment.
 
 ---
 
+## Architectural Analysis & Success Criteria Answers
+
+### 1. Why Sessions instead of JWT?
+- **Instant Revocation:** If a user logs out, rotates their password, or their account is suspended, the server can instantly delete the session from the database/Redis, terminating access immediately.
+- **Minimal Bandwidth:** A session cookie carries a simple ID (e.g., 32 characters), keeping HTTP header sizes small.
+- **XSS Immunity:** Session cookies protected by `HttpOnly` cannot be read by JavaScript, rendering them immune to XSS theft.
+
+### 2. Why JWT instead of Sessions?
+- **Stateless Verification:** The server verifies tokens mathematically using a secret key without querying a database on every request, reducing authentication latency.
+- **Decoupled Scaling:** Eliminates the need for shared session stores (Redis) or sticky sessions across horizontal clusters.
+- **Microservices-Native:** Multiple decentralized services can verify claims independently if they possess the token's signing key.
+
+### 3. Why Refresh Tokens?
+- **Security-Lifetime Tradeoff:** Allows access tokens to be extremely short-lived (e.g., 5 mins) to minimize the window of abuse if stolen, while long-lived refresh tokens (e.g., 30 mins) maintain session continuity.
+- **Refresh Token Rotation (RTR):** Protects against token replay. Every time a refresh token is used, it is rotated. If a compromised/used refresh token is presented, the server revokes the entire token family.
+
+### 4. When is OAuth necessary?
+- **Delegated Access:** When an application needs to authorize third-party integrations (e.g., fetching a user's Google Calendar) without access to their credentials.
+- **Federated Identity:** Offloading identity management to external Providers (e.g., "Sign In with Apple").
+
+### 5. When are API Keys sufficient?
+- **Machine-to-Machine (M2M):** Server-to-server calls, CLI tools, or developer-facing APIs where user-interactive login is absent.
+- **High-Performance Integrations:** Simple authorization checks with low signing overhead.
+
+### 6. When should RBAC be used?
+- **Role-Based Provisioning:** When permissions are groupable into structural roles (Admin, Editor, Viewer). Scale limit: becomes complex ("role explosion") in setups needing fine-grained attribute-based access.
+
+### 7. Core Benchmarks
+- **What scales best?** **Stateless JWTs** scale best. No database checks are required to verify the authentication signature.
+- **What is easiest to operate?** **Stateful Sessions** are easiest. Key rotation, client-side XSS mitigation, and token revocation logic are non-issues.
+- **What is most secure?**
+  - *Browsers:* **Session Cookies** (SameSite, HttpOnly, Secure) prevent XSS token theft.
+  - *APIs/Mobile:* **JWT Access + Refresh Tokens** utilizing RTR and secure storage.
+
+---
+
 ## Relationship To RAG2Prod
 
 This repository exists because security architecture decisions should not be based on trends.
