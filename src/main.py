@@ -1,23 +1,15 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+import time
+import jwt
+from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from .database import engine, Base, get_db
-from .models import User, Session as DbSessionModel, APIKey
-from .security import hash_password, compute_digest_ha1
-from .session_store import in_memory_session_store
-from .auth import basic, digest, api_key, session
-
-# Create SQLite tables on startup
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Auth2Prod - Authentication Systems Visualizer",
-    description="A diagnostic environment for studying Basic, Digest, API Key, and Session Authentication."
+    title="Auth2Prod - JWT Protocol Visualizer & Playground",
+    description="A diagnostic environment for studying JWT structure, claims, signature validation, and token tampering."
 )
 
-# Enable CORS for development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,114 +18,129 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Authentication routers
-app.include_router(basic.router)
-app.include_router(digest.router)
-app.include_router(api_key.router)
-app.include_router(session.router)
-
-# User registration endpoint
-@app.post("/register")
-def register_user(payload: dict, db: Session = Depends(get_db)):
-    username = payload.get("username")
-    password = payload.get("password")
+@app.post("/api/playground/generate")
+def generate_jwt(payload: dict, request: Request):
+    """Generates a JWT token using custom inputs for study."""
+    sub = payload.get("sub", "123")
+    username = payload.get("username", "alice")
+    role = payload.get("role", "user")
+    expires_in = int(payload.get("expires_in", 60))  # seconds
+    secret = payload.get("secret", "playground-secret-key-123456")
+    alg = payload.get("alg", "HS256")
     
-    if not username or not password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username and password are required"
-        )
+    # Custom headers
+    headers = {"typ": "JWT", "alg": alg}
+    
+    # Build claims
+    now = int(time.time())
+    token_claims = {
+        "sub": sub,
+        "username": username,
+        "role": role,
+        "iat": now,
+        "exp": now + expires_in
+    }
+    
+    try:
+        token = jwt.encode(token_claims, secret, algorithm=alg, headers=headers)
         
-    existing = db.query(User).filter(User.username == username).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
-        
-    # Store bcrypt hash for Basic/Session auth
-    hashed_pw = hash_password(password)
-    # Store precomputed MD5 HA1 hash for Digest auth
-    digest_ha1 = compute_digest_ha1(username, password)
-    
-    new_user = User(
-        username=username, 
-        hashed_password=hashed_pw, 
-        digest_ha1=digest_ha1
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    return {
-        "message": f"User '{username}' registered successfully!",
-        "user": {
-            "id": new_user.id,
-            "username": new_user.username
+        debug_meta = {
+            "request": {
+                "method": "POST",
+                "url": str(request.url),
+                "headers": dict(request.headers),
+                "body": payload
+            },
+            "db_actions": ["No DB check (Stateless token creation on server)"],
+            "response_headers": {}
         }
-    }
+        
+        return {
+            "token": token,
+            "header": headers,
+            "payload": token_claims,
+            "debug": debug_meta
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to generate JWT: {str(e)}"
+        )
 
-# Debug & visualization endpoints
-@app.get("/api/debug/state")
-def get_debug_state(db: Session = Depends(get_db)):
-    """Returns the current state of users, active DB sessions, in-memory sessions, and API keys."""
-    users = db.query(User).all()
-    api_keys = db.query(APIKey).all()
-    db_sessions = db.query(DbSessionModel).all()
+@app.post("/api/playground/verify")
+def verify_jwt(payload: dict, request: Request):
+    """Verifies a JWT token with a specified secret and algorithm, returning granular diagnostics."""
+    token = payload.get("token", "")
+    secret = payload.get("secret", "playground-secret-key-123456")
+    alg = payload.get("alg", "HS256")
+    
+    db_actions = []
+    resp_headers = {}
+    
+    try:
+        # Decode without verification first to extract raw header/payload details for diagnostic display
+        unverified_header = jwt.get_unverified_header(token)
+        unverified_payload = jwt.decode(token, options={"verify_signature": False})
+    except Exception as e:
+        # Malformed token structure (not 3 dot-separated parts)
+        return {
+            "is_valid": False,
+            "error_type": "InvalidTokenError",
+            "message": f"Malformed JWT structure: {str(e)}",
+            "header": {},
+            "payload": {},
+            "debug": {
+                "request": {
+                    "method": "POST",
+                    "url": str(request.url),
+                    "headers": dict(request.headers),
+                    "body": payload
+                },
+                "db_actions": ["No DB check (Stateless check failed early)"],
+                "response_headers": resp_headers
+            }
+        }
+        
+    try:
+        # Full validation check
+        verified_payload = jwt.decode(token, secret, algorithms=[alg])
+        is_valid = True
+        message = "Signature is valid and token is active."
+        error_type = None
+    except jwt.ExpiredSignatureError:
+        is_valid = False
+        error_type = "ExpiredSignatureError"
+        message = "Token has expired (exp claim is in the past)."
+    except jwt.InvalidSignatureError:
+        is_valid = False
+        error_type = "InvalidSignatureError"
+        message = "Signature verification failed. The token was tampered with or signed with a different secret."
+    except jwt.InvalidTokenError as e:
+        is_valid = False
+        error_type = "InvalidTokenError"
+        message = f"Token validation failed: {str(e)}"
+        
+    debug_meta = {
+        "request": {
+            "method": "POST",
+            "url": str(request.url),
+            "headers": dict(request.headers),
+            "body": payload
+        },
+        "db_actions": ["No DB check (Stateless check completed successfully)"],
+        "response_headers": resp_headers
+    }
     
     return {
-        "users": [
-            {
-                "id": u.id,
-                "username": u.username,
-                "has_basic_hash": u.hashed_password is not None,
-                "has_digest_ha1": u.digest_ha1 is not None
-            } for u in users
-        ],
-        "api_keys": [
-            {
-                "id": k.id,
-                "prefix": k.key_prefix,
-                "hashed_key": k.hashed_key[:12] + "...",
-                "user_id": k.user_id,
-                "username": k.user.username if k.user else "Unknown",
-                "description": k.description,
-                "is_active": k.is_active,
-                "created_at": k.created_at.isoformat()
-            } for k in api_keys
-        ],
-        "db_sessions": [
-            {
-                "id": s.id,
-                "session_id": s.session_id[:12] + "...",
-                "user_id": s.user_id,
-                "username": s.user.username if s.user else "Unknown",
-                "created_at": s.created_at.isoformat(),
-                "expires_at": s.expires_at.isoformat()
-            } for s in db_sessions
-        ],
-        "in_memory_sessions": in_memory_session_store.get_all()
+        "is_valid": is_valid,
+        "error_type": error_type,
+        "message": message,
+        "header": unverified_header,
+        "payload": unverified_payload,
+        "debug": debug_meta
     }
 
-@app.get("/api/debug/echo-headers")
-def echo_headers(request: Request):
-    """Echoes back all received request headers and cookies for diagnostic display."""
-    return {
-        "headers": dict(request.headers),
-        "cookies": dict(request.cookies)
-    }
-
-@app.post("/api/debug/reset")
-def reset_system(db: Session = Depends(get_db)):
-    """Clears all users, API keys, and sessions (DB and in-memory)."""
-    db.query(DbSessionModel).delete()
-    db.query(APIKey).delete()
-    db.query(User).delete()
-    db.commit()
-    in_memory_session_store.store.clear()
-    return {"message": "All database and in-memory states have been reset."}
-
-# Mount static files (must be mounted after custom routes to avoid overlapping root issues)
+# Mount static files
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
 @app.get("/")

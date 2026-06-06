@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auth2Prod - Authentication Systems Visualizer</title>
-    <!-- Google Fonts: Inter & Outfit -->
+    <title>Auth2Prod - JWT Protocol Visualizer & Tampering Playground</title>
+    <!-- Google Fonts: Inter, Outfit, & Fira Code -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -15,185 +15,78 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-logo">
-                <span class="logo-icon">🔐</span>
-                <h1>Auth2Prod <span class="logo-sub">Diagnostic Workspace</span></h1>
+                <span class="logo-icon">🔬</span>
+                <h1>JWT Visual Playground <span class="logo-sub">Protocol Diagnostic Console</span></h1>
             </div>
             <div class="header-actions">
-                <button id="reset-db-btn" class="btn btn-danger">Reset Server Database</button>
+                <a href="http://127.0.0.1:8000/" class="btn btn-secondary btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; height: 32px; font-weight: 500;">👈 Back to App Hub</a>
             </div>
         </header>
 
         <!-- Main Workspace -->
         <main class="workspace">
             
-            <!-- Left Side: Client Control Center -->
+            <!-- Left Side: Token Factory & Tampering Station -->
             <section class="panel client-panel">
                 <div class="panel-header">
-                    <h2>🖥️ Client Workspace</h2>
-                    <span class="badge badge-client">Client-Side</span>
+                    <h2>🖥️ Client Token Factory</h2>
+                    <span class="badge badge-client">Generator</span>
                 </div>
 
-                <!-- Registration Card -->
+                <!-- Token Parameters Card -->
                 <div class="card registration-card">
-                    <h3>Create Test User</h3>
-                    <p class="card-desc">Registers a user. Computes standard bcrypt hash and a precomputed MD5 HA1 hash (for Digest Auth).</p>
-                    <form id="register-form" class="form-grid">
+                    <h3>1. Customize JWT Claims</h3>
+                    <p class="card-desc">Configure claims and headers to compile a custom JWT. A stateless token contains all user state within itself.</p>
+                    <form id="generate-form" class="form-grid">
                         <div class="input-group">
-                            <label for="reg-username">Username</label>
-                            <input type="text" id="reg-username" placeholder="e.g. alice" required>
+                            <label for="claim-sub">Subject (User ID - sub)</label>
+                            <input type="text" id="claim-sub" value="42" placeholder="e.g. 42" required>
                         </div>
                         <div class="input-group">
-                            <label for="reg-password">Password</label>
-                            <input type="password" id="reg-password" placeholder="••••••••" required>
+                            <label for="claim-username">Username</label>
+                            <input type="text" id="claim-username" value="charlie" placeholder="e.g. charlie" required>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-full">Register User</button>
+                        <div class="input-group">
+                            <label for="claim-role">Role</label>
+                            <select id="claim-role">
+                                <option value="user">User (Standard Access)</option>
+                                <option value="admin">Administrator (Elevated Access)</option>
+                                <option value="guest">Guest (ReadOnly)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="claim-expiry">Expiry Limit (Seconds - exp)</label>
+                            <input type="number" id="claim-expiry" value="60" min="1" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="signing-alg">Signature Algorithm (alg)</label>
+                            <select id="signing-alg">
+                                <option value="HS256">HMAC + SHA-256 (HS256)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="signing-secret">Signing Key / Secret</label>
+                            <input type="text" id="signing-secret" value="playground-secret-key-123456" placeholder="symmetric key" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">Generate Signed Token</button>
                     </form>
                 </div>
 
-                <!-- Auth Methods Control -->
-                <div class="card auth-methods-card">
-                    <h3>Authentication Methods</h3>
+                <!-- Raw Token & Segment Analysis -->
+                <div class="card auth-methods-card" style="margin-top: 1rem;">
+                    <h3>2. Colored JWT Segment Map</h3>
+                    <p class="card-desc">JWT is structured as: <code>Header</code> (Red) . <code>Payload</code> (Purple) . <code>Signature</code> (Blue) encoded in base64url.</p>
                     
-                    <!-- Tabs -->
-                    <div class="tabs">
-                        <button class="tab-btn active" data-tab="basic">Basic</button>
-                        <button class="tab-btn" data-tab="digest">Digest</button>
-                        <button class="tab-btn" data-tab="apikey">API Key</button>
-                        <button class="tab-btn" data-tab="session">Session</button>
+                    <div class="jwt-segmented-box" id="jwt-segmented-box">
+                        <span class="empty-state-text">No token generated yet</span>
                     </div>
 
-                    <!-- Tab Contents -->
-                    <div class="tab-content active" id="tab-basic">
-                        <h4>HTTP Basic Authentication</h4>
-                        <p class="tab-desc">Sends credentials base64-encoded in the <code>Authorization: Basic &lt;blob&gt;</code> header.</p>
-                        
-                        <div class="form-grid">
-                            <div class="input-group">
-                                <label for="basic-username">Username</label>
-                                <input type="text" id="basic-username" placeholder="alice">
-                            </div>
-                            <div class="input-group">
-                                <label for="basic-password">Password</label>
-                                <input type="password" id="basic-password" placeholder="••••••••">
-                            </div>
-                            <button id="btn-basic-submit" class="btn btn-success btn-full">Send Request (Basic Auth)</button>
-                        </div>
+                    <hr class="divider">
 
-                        <div class="spec-info">
-                            <h5>How it works:</h5>
-                            <ul>
-                                <li>Client hashes: <code>b64encode(username + ":" + password)</code></li>
-                                <li>Sends header: <code class="break-word">Authorization: Basic YWxpY2U6cGFzc3dvcmQ=</code></li>
-                                <li><strong>Stateless:</strong> Every single request must include this header.</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="tab-digest">
-                        <h4>HTTP Digest Authentication (RFC 2617)</h4>
-                        <p class="tab-desc">Challenge-response scheme. Server challenges with a nonce. Client responds with MD5 hashes, protecting the password from wire-sniffing.</p>
-                        
-                        <div class="form-grid">
-                            <div class="input-group">
-                                <label for="digest-username">Username</label>
-                                <input type="text" id="digest-username" placeholder="alice">
-                            </div>
-                            <div class="input-group">
-                                <label for="digest-password">Password</label>
-                                <input type="password" id="digest-password" placeholder="••••••••">
-                            </div>
-                            <button id="btn-digest-submit" class="btn btn-success btn-full">Send Request (Digest Auth)</button>
-                        </div>
-
-                        <div class="spec-info">
-                            <h5>Double Request Handshake:</h5>
-                            <ol>
-                                <li>Client requests <code>/auth/digest/protected</code> without auth.</li>
-                                <li>Server replies with <strong>401 Unauthorized</strong> & <code>WWW-Authenticate: Digest realm="...", nonce="..."</code></li>
-                                <li>Client calculates MD5 hashes using the nonce, realm, and password.</li>
-                                <li>Client sends secondary request with <code>Authorization: Digest username="...", response="..."</code></li>
-                            </ol>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="tab-apikey">
-                        <h4>API Key Authentication</h4>
-                        <p class="tab-desc">Header-based token auth. Use Basic credentials to generate an API key, then use the key to authenticate.</p>
-                        
-                        <div class="api-key-actions">
-                            <div class="form-grid">
-                                <div class="input-group">
-                                    <label for="apikey-gen-username">Auth Username</label>
-                                    <input type="text" id="apikey-gen-username" placeholder="Username (to authenticate generation)">
-                                </div>
-                                <div class="input-group">
-                                    <label for="apikey-gen-password">Auth Password</label>
-                                    <input type="password" id="apikey-gen-password" placeholder="Password">
-                                </div>
-                                <button id="btn-apikey-generate" class="btn btn-primary btn-full">Generate API Key</button>
-                            </div>
-
-                            <div id="generated-key-container" class="generated-key-box hidden">
-                                <strong>Your New API Key (Save it!):</strong>
-                                <code id="generated-key-value">ap_...</code>
-                            </div>
-
-                            <hr class="divider">
-
-                            <div class="form-grid">
-                                <div class="input-group">
-                                    <label for="apikey-value">API Key to Use</label>
-                                    <input type="text" id="apikey-value" placeholder="ap_...">
-                                </div>
-                                <button id="btn-apikey-submit" class="btn btn-success btn-full">Send Request (API Key)</button>
-                            </div>
-                        </div>
-
-                        <div class="spec-info">
-                            <h5>How it works:</h5>
-                            <ul>
-                                <li>Client sends key in custom header: <code>X-API-Key: ap_xyz...</code></li>
-                                <li>Server hashes key via SHA-256 and checks database.</li>
-                                <li>Commonly used for Machine-to-Machine (M2M) communication.</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="tab-session">
-                        <h4>Cookie-Based Session Authentication</h4>
-                        <p class="tab-desc">Stateful authentication. Server validates credentials once, saves session state, and returns a session cookie. Browser automatically sends cookies on subsequent requests.</p>
-                        
-                        <div class="form-grid">
-                            <div class="input-group">
-                                <label for="session-username">Username</label>
-                                <input type="text" id="session-username" placeholder="alice">
-                            </div>
-                            <div class="input-group">
-                                <label for="session-password">Password</label>
-                                <input type="password" id="session-password" placeholder="••••••••">
-                            </div>
-                            <div class="input-group">
-                                <label for="session-store-type">Session Storage Type</label>
-                                <select id="session-store-type">
-                                    <option value="memory">In-Memory Store (Process-bound)</option>
-                                    <option value="db">SQLite Database Store (Shared State)</option>
-                                </select>
-                            </div>
-                            <div class="btn-group">
-                                <button id="btn-session-login" class="btn btn-primary">Login & Set Session</button>
-                                <button id="btn-session-logout" class="btn btn-danger">Logout</button>
-                            </div>
-                            <button id="btn-session-submit" class="btn btn-success btn-full">Send Request (Access Protected)</button>
-                        </div>
-
-                        <div class="spec-info">
-                            <h5>Stateful session lifecycle:</h5>
-                            <ul>
-                                <li><strong>Login:</strong> Server validates credentials, generates random session ID, records it in the store, and returns <code>Set-Cookie: auth2prod_session_id=...</code></li>
-                                <li><strong>Requests:</strong> Browser automatically attaches <code>Cookie: auth2prod_session_id=...</code></li>
-                                <li><strong>Scale problem:</strong> In-Memory stores fail when requests go to different server instances. Database/Redis stores solve this by centralizing state.</li>
-                            </ul>
-                        </div>
+                    <h3>3. Tampering Sandbox</h3>
+                    <p class="card-desc">Modify the raw token below. E.g. change a letter in the signature to simulate tampering, or modify the payload directly.</p>
+                    <div class="input-group">
+                        <textarea id="tamper-token-area" rows="4" class="code-textarea" placeholder="Paste or modify token here..."></textarea>
                     </div>
                 </div>
             </section>
@@ -201,65 +94,61 @@
             <!-- Right Side: Server State & Network Logs -->
             <section class="panel server-panel">
                 <div class="panel-header">
-                    <h2>⚙️ Server State & Network Logs</h2>
-                    <span class="badge badge-server">Server-Side</span>
+                    <h2>⚙️ Server Verifier & Diagnostics</h2>
+                    <span class="badge badge-server">Stateless Check</span>
                 </div>
 
-                <!-- Database State Card -->
+                <!-- Verifier Console Card -->
                 <div class="card state-card">
-                    <div class="state-card-header">
-                        <h3>Server Storage State</h3>
-                        <button id="refresh-state-btn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
-                    </div>
+                    <h3>JWT Verification Parameters</h3>
+                    <p class="card-desc">Send the token to the server to verify its signature, structure, and expiration limits.</p>
                     
-                    <div class="state-grid">
-                        <!-- Users -->
-                        <div class="state-bucket">
-                            <h4>Registered Users (SQLite)</h4>
-                            <div class="scroll-box" id="users-list">
-                                <div class="empty-state">No users registered yet</div>
-                            </div>
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="verify-secret">Verifier Secret Key</label>
+                            <input type="text" id="verify-secret" value="playground-secret-key-123456" placeholder="symmetric secret" required>
                         </div>
-
-                        <!-- API Keys -->
-                        <div class="state-bucket">
-                            <h4>Active API Keys (SQLite)</h4>
-                            <div class="scroll-box" id="apikeys-list">
-                                <div class="empty-state">No API Keys generated</div>
-                            </div>
+                        <div class="input-group">
+                            <label for="verify-alg">Expected Algorithm</label>
+                            <select id="verify-alg">
+                                <option value="HS256">HS256</option>
+                            </select>
                         </div>
+                        <button id="btn-verify-submit" class="btn btn-success btn-full">Submit Token to Verifier</button>
+                    </div>
 
-                        <!-- Sessions (DB) -->
-                        <div class="state-bucket">
-                            <h4>Sessions in Database (SQLite)</h4>
-                            <div class="scroll-box" id="db-sessions-list">
-                                <div class="empty-state">No active DB sessions</div>
-                            </div>
+                    <div class="spec-info" id="verify-result-box" style="margin-top: 1rem;">
+                        <div class="verify-status-header">
+                            <h5>Verification Result:</h5>
+                            <span id="verify-status-badge" class="hud-status status-red">Awaiting Submission</span>
                         </div>
-
-                        <!-- Sessions (In-Memory) -->
-                        <div class="state-bucket">
-                            <h4>Sessions in Memory (RAM)</h4>
-                            <div class="scroll-box" id="memory-sessions-list">
-                                <div class="empty-state">No active in-memory sessions</div>
+                        <p id="verify-message" class="text-sm" style="margin: 0.5rem 0;">No verification actions run yet.</p>
+                        
+                        <div class="decoded-viewers hidden" id="decoded-viewers">
+                            <div class="viewer-block">
+                                <strong>Decoded Header:</strong>
+                                <pre id="verify-header" class="code-block text-xs">{}</pre>
+                            </div>
+                            <div class="viewer-block">
+                                <strong>Decoded Payload (Claims):</strong>
+                                <pre id="verify-payload" class="code-block text-xs">{}</pre>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Network Log Console -->
-                <div class="card network-card">
+                <div class="card network-card flex-grow-1" style="margin-top: 1rem;">
                     <div class="network-header">
-                        <h3>HTTP Traffic Logs</h3>
+                        <h3>Traffic Transmission Logs</h3>
                         <button id="clear-logs-btn" class="btn btn-secondary btn-sm">Clear Logs</button>
                     </div>
                     
                     <div class="network-timeline" id="network-timeline">
-                        <div class="empty-network">No network requests sent yet. Use the client controls to trigger requests.</div>
+                        <div class="empty-network">No traffic requests captured. Generate and submit a token to monitor requests.</div>
                     </div>
                 </div>
             </section>
-
         </main>
     </div>
     
