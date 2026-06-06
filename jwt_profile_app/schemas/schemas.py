@@ -12,7 +12,6 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
-    secure_cookie: Optional[bool] = False
 
 
 class ProfileUpdate(BaseModel):
@@ -37,18 +36,8 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
-class ChallengeRequest(BaseModel):
-    username: str
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
 
-
-class ChallengeResponse(BaseModel):
-    username: str
-    nonce: str
-    salt: str
-
-
-class ChallengeLoginRequest(BaseModel):
-    username: str
-    nonce: str
-    auth_hash: str
-    secure_cookie: Optional[bool] = False
