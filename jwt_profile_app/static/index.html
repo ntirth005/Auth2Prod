@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auth2Prod - Profile & Session Lifecycle App</title>
+    <title>Auth2Prod - JWT Stateless Authentication & RTR App</title>
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,8 +15,8 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-logo">
-                <span class="logo-icon">👤</span>
-                <h1>Session & Profile Hub <span class="logo-sub">Production Sandbox</span></h1>
+                <span class="logo-icon">🔑</span>
+                <h1>JWT Profile Hub <span class="logo-sub">Stateless Sandbox</span></h1>
             </div>
             <div class="header-actions">
                 <button id="reset-db-btn" class="btn btn-danger">Reset Sandbox DB</button>
@@ -38,14 +38,8 @@
                     <!-- Login Form -->
                     <form id="login-form" class="auth-form form-grid">
                         <h3>Welcome Back</h3>
-                        <p class="auth-desc">Log in using your registered credentials to establish a secure database-backed session.</p>
-                        <div class="input-group">
-                            <label for="login-auth-mode">Authentication Protocol Mode</label>
-                            <select id="login-auth-mode" style="width: 100%;">
-                                <option value="standard">Standard Flow (Plaintext password transmitted)</option>
-                                <option value="cryptographic">Zero-Transmission Flow (Client-side hashed handshake)</option>
-                            </select>
-                        </div>
+                        <p class="auth-desc">Log in using credentials. Server issues a stateless JWT Access Token and sets a database-tracked HttpOnly Refresh Token cookie.</p>
+                        
                         <div class="input-group">
                             <label for="login-username">Username</label>
                             <input type="text" id="login-username" placeholder="e.g. bob" required>
@@ -54,11 +48,7 @@
                             <label for="login-password">Password</label>
                             <input type="password" id="login-password" placeholder="••••••••" required>
                         </div>
-                        <div class="input-group-checkbox">
-                            <input type="checkbox" id="login-secure-cookie">
-                            <label for="login-secure-cookie">🔒 Enable HTTPS-Only Cookie (Secure Flag)</label>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-full">Authenticate & Sessionize</button>
+                        <button type="submit" class="btn btn-primary btn-full">Authenticate & Issue JWT</button>
                     </form>
 
                     <!-- Register Form -->
@@ -97,13 +87,16 @@
                             <h2 id="greet-name">Hello, User</h2>
                             <p id="greet-username">@username</p>
                         </div>
-                        <button id="logout-btn" class="btn btn-danger btn-sm logout-header-btn">Log Out</button>
+                        <div class="btn-group-header">
+                            <button id="refresh-token-btn" class="btn btn-secondary btn-sm" style="margin-right: 0.5rem;">🔄 Rotate Token</button>
+                            <button id="logout-btn" class="btn btn-danger btn-sm logout-header-btn">Log Out</button>
+                        </div>
                     </div>
 
                     <!-- Profile Edit Form -->
                     <div class="card form-card">
                         <h3>Modify Profile Fields</h3>
-                        <p class="card-desc">These columns exist in the SQLite <code>users</code> table. Any change will write to the DB inside your active session context.</p>
+                        <p class="card-desc">Profile edits will be sent as an authorized HTTP request using the JWT Access Token in the <code>Authorization: Bearer</code> header.</p>
                         <form id="profile-update-form" class="form-grid">
                             <div class="input-group">
                                 <label for="profile-display-name">Display Name</label>
@@ -124,7 +117,7 @@
                     <!-- Password Rotation Form -->
                     <div class="card form-card">
                         <h3>Rotate Password</h3>
-                        <p class="card-desc">Changing your password invalidates all other active sessions for security, preserving only your current session.</p>
+                        <p class="card-desc">Changing your password invalidates all active refresh tokens in the database, logging out all other devices and clients.</p>
                         <form id="password-change-form" class="form-grid">
                             <div class="input-group">
                                 <label for="pwd-current">Current Password</label>
@@ -147,18 +140,30 @@
                     <span class="badge badge-server">Server State</span>
                 </div>
 
-                <!-- Session Cookie HUD -->
+                <!-- JWT Token HUD -->
                 <div class="card state-card flex-shrink-0">
-                    <h3>Client Cookie HUD</h3>
-                    <p class="card-desc">Exposes raw browser-attached cookie payloads and their resolution properties.</p>
-                    <div class="cookie-debugger-grid">
-                        <div class="debugger-item">
-                            <strong>Cookie Found:</strong>
-                            <span id="cookie-status-badge" class="hud-status status-red">NO COOKIE</span>
+                    <h3>Client-Side JWT HUD</h3>
+                    <p class="card-desc">Shows the raw state of the Access Token stored in JS memory, along with its decoded signature and claims payload, plus the HttpOnly Refresh Cookie.</p>
+                    <div class="jwt-hud-grid">
+                        <div class="hud-row">
+                            <strong>Access Token State:</strong>
+                            <span id="jwt-status-badge" class="hud-status status-red">NO ACCESS TOKEN</span>
                         </div>
-                        <div class="debugger-item break-word">
-                            <strong>Raw Session Cookie:</strong>
-                            <code id="cookie-raw-val" class="break-word">None</code>
+                        <div class="hud-row">
+                            <strong>Raw JWT (Shortened):</strong>
+                            <code id="jwt-raw-val" class="break-word text-sm">None</code>
+                        </div>
+                        <div class="hud-row">
+                            <strong>Refresh Cookie State:</strong>
+                            <span id="refresh-status-badge" class="hud-status status-red">NO COOKIE</span>
+                        </div>
+                        <div class="hud-row">
+                            <strong>Raw Refresh Cookie:</strong>
+                            <code id="refresh-raw-val" class="break-word text-sm">None</code>
+                        </div>
+                        <div class="hud-row-claims">
+                            <strong>Decoded Claims (Payload):</strong>
+                            <pre id="jwt-decoded-claims" class="code-block text-xs">{}</pre>
                         </div>
                     </div>
                 </div>
@@ -178,9 +183,9 @@
                             </div>
                         </div>
 
-                        <!-- Sessions Table -->
+                        <!-- Refresh Tokens Table -->
                         <div class="state-bucket">
-                            <h4>session_records Table</h4>
+                            <h4>refresh_tokens Table (RTR)</h4>
                             <div class="scroll-box" id="sessions-list">
                                 <div class="empty-state">No active sessions</div>
                             </div>
