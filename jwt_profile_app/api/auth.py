@@ -1,23 +1,23 @@
-import secrets
-import hashlib
 from datetime import datetime, timedelta
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from session_profile_app.core.database import get_db
-from session_profile_app.models.models import User, LoginChallenge
-from session_profile_app.schemas.schemas import (
-    UserRegister, UserLogin, UserResponse,
-    ChallengeRequest, ChallengeLoginRequest
+from jwt_profile_app.core.database import get_db
+from jwt_profile_app.models.models import User, RefreshToken
+from jwt_profile_app.schemas.schemas import (
+    UserRegister, UserLogin, UserResponse, TokenResponse
 )
-from session_profile_app.core.security import hash_password, verify_password
-from session_profile_app.core.session import DatabaseSessionManager
-from session_profile_app.core.logging import get_logger
-from session_profile_app.core.config import settings
+from jwt_profile_app.core.security import hash_password, verify_password
+from jwt_profile_app.core.jwt_helper import (
+    create_access_token, create_refresh_token, generate_jti, decode_token
+)
+from jwt_profile_app.core.logging import get_logger
+from jwt_profile_app.core.config import settings
 from .utils import capture_debug_meta
 
 router = APIRouter()
-logger = get_logger("session_profile_app")
+logger = get_logger("jwt_profile_app")
 
 @router.post("/api/register")
 async def register(request: Request, user_in: UserRegister, db: Session = Depends(get_db)):
@@ -32,13 +32,9 @@ async def register(request: Request, user_in: UserRegister, db: Session = Depend
         )
     
     hashed = hash_password(user_in.password)
-    salt = secrets.token_hex(16)
-    client_key = hashlib.sha256((user_in.password + salt).encode('utf-8')).hexdigest()
     new_user = User(
         username=user_in.username,
         hashed_password=hashed,
-        salt=salt,
-        client_key=client_key,
         display_name=user_in.display_name or user_in.username,
         email=user_in.email,
         bio=user_in.bio
@@ -64,176 +60,187 @@ async def login(request: Request, response: Response, login_in: UserLogin, db: S
     ]
     user = db.query(User).filter(User.username == login_in.username).first()
     if not user or not verify_password(login_in.password, user.hashed_password):
-        logger.warning("Failed standard login attempt", extra={"extra_fields": {"username": login_in.username}})
+        logger.warning("Failed login attempt", extra={"extra_fields": {"username": login_in.username}})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password."
         )
 
-    # Create Session
-    session_mgr = DatabaseSessionManager(db)
-    expires_delta = timedelta(minutes=settings.SESSION_EXPIRY_MINUTES)
-    session_id = session_mgr.create_session(user.id, expires_delta)
-    logger.info("User authenticated via standard login", extra={"extra_fields": {"username": user.username, "user_id": user.id}})
-    db_queries.append(f"INSERT INTO session_records (session_id, user_id, expires_at) VALUES ('{session_id[:6]}...', {user.id}, ...)")
+    # 1. Issue Access Token (Stateless)
+    access_token = create_access_token(user.id, user.username)
+    
+    # 2. Issue Refresh Token (Database tracked for rotation/revocation)
+    jti = generate_jti()
+    refresh_token = create_refresh_token(user.id, jti)
+    
+    # Save Refresh Token state in database
+    expires_at = datetime.utcnow() + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRY_MINUTES)
+    db_refresh_token = RefreshToken(
+        token_jti=jti,
+        user_id=user.id,
+        expires_at=expires_at,
+        is_revoked=False
+    )
+    db.add(db_refresh_token)
+    db.commit()
+    
+    logger.info("User logged in, tokens issued", extra={"extra_fields": {"username": user.username, "user_id": user.id}})
+    db_queries.append(f"INSERT INTO refresh_tokens (token_jti, user_id, expires_at, is_revoked) VALUES ('{jti[:8]}...', {user.id}, ..., False)")
 
-    # Set Session Cookie
+    # 3. Store Refresh Token in HttpOnly cookie
     response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=session_id,
+        key=settings.REFRESH_TOKEN_COOKIE_NAME,
+        value=refresh_token,
         httponly=True,
         samesite="lax",
-        secure=login_in.secure_cookie,
-        max_age=settings.SESSION_EXPIRY_MINUTES * 60
+        secure=False,  # Set to True in HTTPS production environments
+        max_age=settings.REFRESH_TOKEN_EXPIRY_MINUTES * 60
     )
     
     resp_headers = {
-        "Set-Cookie": f"{settings.SESSION_COOKIE_NAME}={session_id[:6]}...; Max-Age={settings.SESSION_EXPIRY_MINUTES*60}; SameSite=Lax; HttpOnly" + ("; Secure" if login_in.secure_cookie else "")
+        "Set-Cookie": f"{settings.REFRESH_TOKEN_COOKIE_NAME}={refresh_token[:12]}...; Max-Age={settings.REFRESH_TOKEN_EXPIRY_MINUTES*60}; SameSite=Lax; HttpOnly"
     }
 
     debug_meta = await capture_debug_meta(request, db_queries, resp_headers)
     return {
         "message": "Login successful!",
-        "session_id": session_id,
+        "access_token": access_token,
+        "token_type": "bearer",
         "user": UserResponse.model_validate(user),
         "debug": debug_meta
     }
 
-@router.post("/api/auth/challenge")
-async def get_challenge(request: Request, req_in: ChallengeRequest, db: Session = Depends(get_db)):
-    db_queries = [
-        f"SELECT * FROM users WHERE username = '{req_in.username}'"
-    ]
-    user = db.query(User).filter(User.username == req_in.username).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found."
-        )
+@router.post("/api/refresh")
+async def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Refreshes the Access Token using the HttpOnly Refresh Token.
     
-    # Generate single-use nonce
-    nonce = secrets.token_hex(16)
+    Implements Refresh Token Rotation (RTR):
+    - Invalidates the used Refresh Token.
+    - Issues a new Refresh Token (rotating the cookie).
+    - Returns a brand new stateless Access Token.
+    """
+    refresh_token = request.cookies.get(settings.REFRESH_TOKEN_COOKIE_NAME)
+    db_queries = []
     
-    # Save challenge nonce
-    expires_at = datetime.utcnow() + timedelta(minutes=2)
-    challenge = LoginChallenge(
-        username=req_in.username,
-        nonce=nonce,
-        expires_at=expires_at
-    )
-    db.add(challenge)
-    db_queries.append(f"INSERT INTO login_challenges (username, nonce, expires_at) VALUES ('{req_in.username}', '{nonce[:6]}...', ...)")
-    db.commit()
-    logger.info("Generated authentication challenge nonce", extra={"extra_fields": {"username": req_in.username}})
-    
-    # Fallback salt if user registered before adding salt column
-    user_salt = user.salt or "0000000000000000"
-    
-    debug_meta = await capture_debug_meta(request, db_queries)
-    return {
-        "username": req_in.username,
-        "nonce": nonce,
-        "salt": user_salt,
-        "debug": debug_meta
-    }
-
-@router.post("/api/auth/challenge-login")
-async def challenge_login(request: Request, response: Response, login_in: ChallengeLoginRequest, db: Session = Depends(get_db)):
-    db_queries = [
-        f"SELECT * FROM login_challenges WHERE nonce = '{login_in.nonce[:6]}...' AND username = '{login_in.username}'",
-        f"SELECT * FROM users WHERE username = '{login_in.username}'"
-    ]
-    
-    # Verify challenge nonce
-    challenge = db.query(LoginChallenge).filter(
-        LoginChallenge.nonce == login_in.nonce,
-        LoginChallenge.username == login_in.username
-    ).first()
-    
-    if not challenge or challenge.expires_at < datetime.utcnow():
-        logger.warning("Failed challenge-login: Invalid/expired challenge nonce", extra={"extra_fields": {"username": login_in.username}})
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired challenge nonce. Please request a new challenge."
-        )
-    
-    # Consume challenge to prevent replay
-    db.delete(challenge)
-    db_queries.append(f"DELETE FROM login_challenges WHERE nonce = '{login_in.nonce[:6]}...'")
-    
-    user = db.query(User).filter(User.username == login_in.username).first()
-    if not user:
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found."
-        )
-        
-    # Ensure client_key is populated (for older registered users)
-    stored_client_key = user.client_key
-    if not stored_client_key:
-        db.commit()
-        logger.warning("Failed challenge-login: Legacy user account missing client_key", extra={"extra_fields": {"username": login_in.username}})
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Legacy user account. Please rotate your password to enable cryptographic auth."
-        )
-        
-    # Verify signature: expected_hash = SHA-256(stored_client_key + nonce)
-    expected_payload = (stored_client_key + login_in.nonce).encode('utf-8')
-    expected_hash = hashlib.sha256(expected_payload).hexdigest()
-    
-    if login_in.auth_hash != expected_hash:
-        db.commit()
-        logger.warning("Failed challenge-login: Cryptographic signature mismatch", extra={"extra_fields": {"username": login_in.username}})
+    if not refresh_token:
+        logger.warning("Token refresh failed: No refresh cookie found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Cryptographic verification failed. Incorrect password."
+            detail="No refresh token cookie found. Please log in again."
         )
         
-    # Establish Session
-    session_mgr = DatabaseSessionManager(db)
-    expires_delta = timedelta(minutes=settings.SESSION_EXPIRY_MINUTES)
-    session_id = session_mgr.create_session(user.id, expires_delta)
-    logger.info("User authenticated via Zero-Password challenge handshake", extra={"extra_fields": {"username": user.username, "user_id": user.id}})
-    db_queries.append(f"INSERT INTO session_records (session_id, user_id, expires_at) VALUES ('{session_id[:6]}...', {user.id}, ...)")
+    try:
+        payload = decode_token(refresh_token)
+        jti = payload.get("jti")
+        user_id = int(payload.get("sub"))
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token refresh failed: Expired refresh token signature")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired. Please log in again."
+        )
+    except jwt.InvalidTokenError:
+        logger.warning("Token refresh failed: Invalid refresh token signature")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token. Please log in again."
+        )
+
+    db_queries.append(f"SELECT * FROM refresh_tokens WHERE token_jti = '{jti[:8]}...'")
+    token_record = db.query(RefreshToken).filter(RefreshToken.token_jti == jti).first()
     
-    # Set Session Cookie
+    # Refresh Token Rotation Security Check:
+    # If the token is not found or is already revoked, it suggests malicious replay attacks.
+    # Industry practice: Revoke all active tokens for the user as a safety measure.
+    if not token_record or token_record.is_revoked or token_record.expires_at < datetime.utcnow():
+        if token_record and token_record.is_revoked:
+            logger.warning(
+                "Refresh Token reuse detected! Revoking all sessions for user.", 
+                extra={"extra_fields": {"user_id": user_id}}
+            )
+            db.query(RefreshToken).filter(RefreshToken.user_id == user_id).update({"is_revoked": True})
+            db.commit()
+            db_queries.append(f"UPDATE refresh_tokens SET is_revoked = True WHERE user_id = {user_id}")
+            
+        response.delete_cookie(settings.REFRESH_TOKEN_COOKIE_NAME)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid, expired, or reused refresh token. Access denied."
+        )
+
+    # 1. Rotate current token: Revoke/delete the used token
+    token_record.is_revoked = True
+    db.commit()
+    db_queries.append(f"UPDATE refresh_tokens SET is_revoked = True WHERE token_jti = '{jti[:8]}...'")
+    
+    # 2. Get user info and generate new tokens
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User associated with token not found."
+        )
+
+    access_token = create_access_token(user.id, user.username)
+    new_jti = generate_jti()
+    new_refresh_token = create_refresh_token(user.id, new_jti)
+    
+    # Save the rotated refresh token to database
+    expires_at = datetime.utcnow() + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRY_MINUTES)
+    db_new_token = RefreshToken(
+        token_jti=new_jti,
+        user_id=user.id,
+        expires_at=expires_at,
+        is_revoked=False
+    )
+    db.add(db_new_token)
+    db.commit()
+    
+    db_queries.append(f"INSERT INTO refresh_tokens (token_jti, user_id, expires_at, is_revoked) VALUES ('{new_jti[:8]}...', {user.id}, ..., False)")
+    logger.info("Rotated refresh token, issued new access token", extra={"extra_fields": {"username": user.username, "user_id": user.id}})
+    
+    # Set the rotated Refresh Token in cookie
     response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=session_id,
+        key=settings.REFRESH_TOKEN_COOKIE_NAME,
+        value=new_refresh_token,
         httponly=True,
         samesite="lax",
-        secure=login_in.secure_cookie,
-        max_age=settings.SESSION_EXPIRY_MINUTES * 60
+        secure=False,
+        max_age=settings.REFRESH_TOKEN_EXPIRY_MINUTES * 60
     )
     
     resp_headers = {
-        "Set-Cookie": f"{settings.SESSION_COOKIE_NAME}={session_id[:6]}...; Max-Age={settings.SESSION_EXPIRY_MINUTES*60}; SameSite=Lax; HttpOnly" + ("; Secure" if login_in.secure_cookie else "")
+        "Set-Cookie": f"{settings.REFRESH_TOKEN_COOKIE_NAME}={new_refresh_token[:12]}...; Max-Age={settings.REFRESH_TOKEN_EXPIRY_MINUTES*60}; SameSite=Lax; HttpOnly"
     }
 
     debug_meta = await capture_debug_meta(request, db_queries, resp_headers)
     return {
-        "message": "Cryptographic authentication successful!",
-        "session_id": session_id,
-        "user": UserResponse.model_validate(user),
+        "access_token": access_token,
+        "token_type": "bearer",
         "debug": debug_meta
     }
 
 @router.post("/api/logout")
 async def logout(request: Request, response: Response, db: Session = Depends(get_db)):
-    session_id = request.cookies.get(settings.SESSION_COOKIE_NAME)
+    refresh_token = request.cookies.get(settings.REFRESH_TOKEN_COOKIE_NAME)
     db_queries = []
     
-    if session_id:
-        session_mgr = DatabaseSessionManager(db)
-        session_mgr.delete_session(session_id)
-        logger.info("User session logged out successfully", extra={"extra_fields": {"session_prefix": session_id[:8]}})
-        db_queries.append(f"DELETE FROM session_records WHERE session_id = '{session_id[:6]}...'")
+    if refresh_token:
+        try:
+            payload = decode_token(refresh_token)
+            jti = payload.get("jti")
+            token_record = db.query(RefreshToken).filter(RefreshToken.token_jti == jti).first()
+            if token_record:
+                token_record.is_revoked = True
+                db.commit()
+                logger.info("Logged out, revoked refresh token", extra={"extra_fields": {"jti_prefix": jti[:8]}})
+                db_queries.append(f"UPDATE refresh_tokens SET is_revoked = True WHERE token_jti = '{jti[:8]}...'")
+        except Exception:
+            pass
 
-    response.delete_cookie(settings.SESSION_COOKIE_NAME)
+    response.delete_cookie(settings.REFRESH_TOKEN_COOKIE_NAME)
     resp_headers = {
-        "Set-Cookie": f"{settings.SESSION_COOKIE_NAME}=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+        "Set-Cookie": f"{settings.REFRESH_TOKEN_COOKIE_NAME}=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
     }
     
     debug_meta = await capture_debug_meta(request, db_queries, resp_headers)
