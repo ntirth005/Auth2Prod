@@ -48,15 +48,15 @@ def get_logger(name: str = "app_logger") -> logging.Logger:
         logger.addHandler(console_handler)
         
         # 2. Structured JSON File Handler
-        # Log file goes into the session_profile_app root directory
+        # Log file goes into the jwt_profile_app root directory
         root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        json_log_file = os.path.join(root_dir, "session_app.log")
+        json_log_file = os.path.join(root_dir, "jwt_app.log")
         json_file_handler = logging.FileHandler(json_log_file, encoding="utf-8")
         json_file_handler.setFormatter(JSONFormatter())
         logger.addHandler(json_file_handler)
         
         # 3. Simple Plaintext File Handler
-        text_log_file = os.path.join(root_dir, "session_app_simple.log")
+        text_log_file = os.path.join(root_dir, "jwt_app_simple.log")
         text_file_handler = logging.FileHandler(text_log_file, encoding="utf-8")
         text_file_handler.setFormatter(
             SimpleTextFormatter(
