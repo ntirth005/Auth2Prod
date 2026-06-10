@@ -1,0 +1,17 @@
+[project]
+name = "auth2prod"
+version = "0.1.0"
+description = "Authentication and Authorization study - OAuth 2.0"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "sqlalchemy>=2.0.0",
+    "pyjwt>=2.8.0",
+    "passlib[bcrypt]>=1.7.4",
+    "cryptography>=42.0.0",
+    "python-multipart>=0.0.9",
+    "httpx>=0.25.0",
+    "python-dotenv>=1.0.0",
+]
