@@ -58,40 +58,48 @@ Creating developer accounts and registering OAuth client applications on both Gi
 
 #### A. GitHub OAuth Setup (Free)
 1. Navigate to GitHub: **Settings** -> **Developer settings** -> **OAuth Apps** -> **New OAuth App**.
-2. Populate the form fields:
-   - **Application Name**: `Auth2Prod OAuth App`
+2. Populate the form fields with your custom information:
+   - **Application Name**: Choose a custom name (e.g., `My-Auth2Prod-App`)
    - **Homepage URL**: `http://localhost:8000`
    - **Authorization callback URL**: `http://localhost:8000/api/auth/github/callback`
 3. Click **Register application**.
 4. Copy your **Client ID**.
-5. Click **Generate a new client secret** and copy it.
+5. Click **Generate a new client secret** and copy it immediately (it will only be shown once).
 
 #### B. Google OAuth Setup (Free)
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project (free).
+2. Create a new project by clicking the project dropdown at the top, select **New Project**, and name it with a custom name of your choice (e.g., `Auth2Prod-Identity-Services`).
 3. Navigate to **APIs & Services** -> **OAuth consent screen**:
-   - Choose **External** user type, click **Create**, and supply basic contact emails.
+   - Choose **External** user type, click **Create**, and supply basic contact info (App name, User support email, Developer email).
 4. Go to **Credentials** -> **Create Credentials** -> **OAuth client ID**:
    - **Application type**: Web application
+   - **Name**: Choose a custom client identifier (e.g., `Auth2Prod-Web-Client`)
    - **Authorized JavaScript origins**: `http://localhost:8000`
    - **Authorized redirect URIs**: `http://localhost:8000/api/auth/google/callback`
 5. Click **Create** and copy your **Client ID** and **Client Secret**.
 
-### 2. Local Environment Configuration
+### 2. Local Environment Configuration (`.env`)
 
-Duplicate `.env.example` into a local `.env` file inside the `oauth_profile_app/` directory and populate your credentials:
+Follow these step-by-step terminal instructions to initialize and populate your application configuration:
 
-```env
-SECRET_KEY=prod-oauth-app-secret-key-999-secure
+1. **Create the `.env` file** inside the `oauth_profile_app/` directory by copying the example template file:
+   ```bash
+   cp oauth_profile_app/.env.example oauth_profile_app/.env
+   ```
+2. **Open the newly created `.env` file** in your favorite text editor, locate the client variables, and replace the placeholder text with your actual registered credentials:
+   ```env
+   SECRET_KEY=prod-oauth-app-secret-key-999-secure
 
-# GitHub OAuth credentials
-GITHUB_CLIENT_ID=your_github_client_id_here
-GITHUB_CLIENT_SECRET=your_github_client_secret_here
+   # GitHub OAuth credentials (paste your credentials copied in Step 1A)
+   GITHUB_CLIENT_ID=your_github_client_id_here
+   GITHUB_CLIENT_SECRET=your_github_client_secret_here
 
-# Google OAuth credentials
-GOOGLE_CLIENT_ID=your_google_client_id_here
-GOOGLE_CLIENT_SECRET=your_google_client_secret_here
-```
+   # Google OAuth credentials (paste your credentials copied in Step 1B)
+   GOOGLE_CLIENT_ID=your_google_client_id_here
+   GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+   ```
+3. Save the `.env` file. (If your `uvicorn` development server is already running, it will automatically reload and apply these credentials).
+
 
 ---
 
