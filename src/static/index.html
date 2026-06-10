@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth2Prod - OAuth 2.0 Playground</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=oauth-2">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <span class="logo-icon">🔑</span>
+                <h1>OAuth 2.0 Hub <span class="logo-sub">Authorization Code Sandbox</span></h1>
+            </div>
+            <div class="header-creds">
+                <div class="cred-tag">User: <code>alice</code> / <code>password123</code></div>
+                <div class="cred-tag">Client ID: <code>mock-client-123</code></div>
+            </div>
+            <div class="header-actions">
+                <button id="reset-db-btn" class="btn btn-danger btn-sm">Reset Sandbox DB</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid -->
+        <main class="workspace">
+            
+            <!-- Left Panel: Client Flow Controller -->
+            <section class="panel client-panel">
+                <div class="panel-header">
+                    <h2>🖥️ Flow Control Center</h2>
+                    <span class="badge badge-flow">OAuth Client</span>
+                </div>
+
+                <!-- Setup Card: Register User / Client -->
+                <div class="card registration-card" style="border: 1px dashed rgba(59, 130, 246, 0.3); padding: 1rem;">
+                    <h3>Create Sandbox Credentials</h3>
+                    <p class="card-desc">Register new user accounts or client applications in the SQLite database.</p>
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <button id="tab-reg-user" class="btn btn-secondary btn-sm" style="flex: 1; background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3);">👤 User</button>
+                        <button id="tab-reg-client" class="btn btn-secondary btn-sm" style="flex: 1;">📱 Client</button>
+                    </div>
+
+                    <!-- User Registration Form -->
+                    <form id="reg-user-form" class="form-grid">
+                        <div class="input-group">
+                            <label for="reg-username">Username</label>
+                            <input type="text" id="reg-username" placeholder="e.g. bob" required style="padding: 0.35rem 0.5rem;">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-password">Password</label>
+                            <input type="password" id="reg-password" placeholder="e.g. password456" required style="padding: 0.35rem 0.5rem;">
+                        </div>
+                        <button type="submit" class="btn btn-success btn-sm btn-full" style="padding: 0.4rem;">Create User</button>
+                    </form>
+
+                    <!-- Client Registration Form -->
+                    <form id="reg-client-form" class="form-grid hidden">
+                        <div class="input-group">
+                            <label for="reg-client-id">Client ID</label>
+                            <input type="text" id="reg-client-id" placeholder="e.g. custom-client-99" required style="padding: 0.35rem 0.5rem;">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-client-name">Client Name</label>
+                            <input type="text" id="reg-client-name" placeholder="e.g. My Custom App" required style="padding: 0.35rem 0.5rem;">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-client-secret">Client Secret</label>
+                            <input type="text" id="reg-client-secret" placeholder="e.g. my-secret-value-88" required style="padding: 0.35rem 0.5rem;">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-client-redirect">Redirect URI</label>
+                            <input type="text" id="reg-client-redirect" value="http://localhost:8000/static/index.html" required style="padding: 0.35rem 0.5rem;">
+                        </div>
+                        <button type="submit" class="btn btn-success btn-sm btn-full" style="padding: 0.4rem;">Register Client</button>
+                    </form>
+                </div>
+
+                <!-- Step 1: Initiate -->
+                <div class="card flow-card active" id="card-step1">
+                    <div class="card-step-header">
+                        <span class="step-num">1</span>
+                        <h3>Step 1: Initiate Auth Request</h3>
+                    </div>
+                    <p class="card-desc">Configure authorization parameters and query authorization endpoint.</p>
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="oauth-client-id">Client ID</label>
+                            <input type="text" id="oauth-client-id" value="mock-client-123">
+                        </div>
+                        <div class="input-group">
+                            <label for="oauth-redirect-uri">Redirect URI</label>
+                            <input type="text" id="oauth-redirect-uri" value="http://localhost:8000/static/index.html">
+                        </div>
+                        <div class="input-group">
+                            <label for="oauth-scope">Scope (space separated)</label>
+                            <input type="text" id="oauth-scope" value="openid profile email">
+                        </div>
+                        <div class="input-group">
+                            <label for="oauth-state">State (anti-CSRF)</label>
+                            <input type="text" id="oauth-state" value="xyz-state-777">
+                        </div>
+                        <button id="btn-initiate-auth" class="btn btn-primary btn-full">Initiate Authorization Flow</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Consent Modal (Inline) -->
+                <div class="card flow-card disabled" id="card-step2">
+                    <div class="card-step-header">
+                        <span class="step-num">2</span>
+                        <h3>Step 2: User Consent & Login</h3>
+                    </div>
+                    <p class="card-desc">Simulated Identity Provider consent dialog and user authentication.</p>
+                    
+                    <div class="consent-box hidden" id="consent-box">
+                        <div class="consent-header">
+                            <h4>🔑 Identity Provider Consent</h4>
+                        </div>
+                        <p class="consent-warning">App <strong><span id="consent-client-name">Loading...</span></strong> requests permissions:</p>
+                        <ul class="consent-scopes" id="consent-scopes-list"></ul>
+                        
+                        <div class="form-grid" style="margin-top: 0.5rem;">
+                            <div class="input-group">
+                                <label for="consent-username">Username</label>
+                                <input type="text" id="consent-username" placeholder="alice">
+                            </div>
+                            <div class="input-group">
+                                <label for="consent-password">Password</label>
+                                <input type="password" id="consent-password" placeholder="••••••••">
+                            </div>
+                            <div class="consent-actions">
+                                <button id="btn-consent-approve" class="btn btn-success btn-sm">Approve</button>
+                                <button id="btn-consent-deny" class="btn btn-danger btn-sm">Deny</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Callback Received -->
+                <div class="card flow-card disabled" id="card-step3">
+                    <div class="card-step-header">
+                        <span class="step-num">3</span>
+                        <h3>Step 3: Callback Authorization Code</h3>
+                    </div>
+                    <p class="card-desc">Authorization Code received in callback URL search parameters.</p>
+                    <div class="info-block">
+                        <div><strong>Code:</strong> <code id="captured-code" class="break-word">None</code></div>
+                        <div><strong>State:</strong> <code id="captured-state">None</code></div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Token Exchange -->
+                <div class="card flow-card disabled" id="card-step4">
+                    <div class="card-step-header">
+                        <span class="step-num">4</span>
+                        <h3>Step 4: Token Exchange (POST)</h3>
+                    </div>
+                    <p class="card-desc">Swap Authorization Code and Client Secret for tokens.</p>
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="exchange-client-secret">Client Secret</label>
+                            <input type="text" id="exchange-client-secret" value="mock-client-secret-999">
+                        </div>
+                        <button id="btn-exchange-code" class="btn btn-primary btn-full">Exchange Authorization Code</button>
+                    </div>
+                </div>
+
+                <!-- Step 5: Resource Access -->
+                <div class="card flow-card disabled" id="card-step5">
+                    <div class="card-step-header">
+                        <span class="step-num">5</span>
+                        <h3>Step 5: Resource Server Queries</h3>
+                    </div>
+                    <p class="card-desc">Call Resource Server using stateless Bearer Access Token.</p>
+                    <div class="btn-group">
+                        <button id="btn-query-userinfo" class="btn btn-success btn-full" style="margin-right: 0.5rem;">Query UserInfo</button>
+                        <button id="btn-query-resource" class="btn btn-success btn-full">Query Resource API</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: DB State & Active Session Diagnostics -->
+            <section class="panel server-panel">
+                <div class="panel-header">
+                    <h2>⚙️ Sandbox Storage & Diagnostics</h2>
+                    <span class="badge badge-server">Server State</span>
+                </div>
+
+                <!-- Client-Side OAuth 2.0 HUD -->
+                <div class="card state-card flex-shrink-0">
+                    <h3>Client-Side OAuth HUD</h3>
+                    <p class="card-desc">Shows token states in memory, authorization code, access/id token status, and decoded claims payload.</p>
+                    <div class="oauth-hud-grid">
+                        <div class="hud-row">
+                            <strong>Authorization Code:</strong>
+                            <span id="code-status-badge" class="hud-status status-red">NO CODE</span>
+                        </div>
+                        <div class="hud-row">
+                            <strong>Access Token State:</strong>
+                            <span id="jwt-status-badge" class="hud-status status-red">NO TOKEN</span>
+                        </div>
+                        <div class="hud-row">
+                            <strong>Raw Access Token (Shortened):</strong>
+                            <code id="jwt-raw-val" class="break-word text-sm" style="font-family: var(--font-mono); font-size: 0.7rem;">None</code>
+                        </div>
+                        <div class="hud-row">
+                            <strong>Raw ID Token (Shortened):</strong>
+                            <code id="id-raw-val" class="break-word text-sm" style="font-family: var(--font-mono); font-size: 0.7rem;">None</code>
+                        </div>
+                        <div class="hud-row-claims">
+                            <strong>Decoded ID Token (OIDC Claims):</strong>
+                            <pre id="jwt-decoded-claims" class="code-block text-xs" style="font-size: 0.7rem; max-height: 80px;">{}</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SQLite DB Inspector -->
+                <div class="card state-card flex-shrink-0" style="margin-top: 0.75rem;">
+                    <div class="state-card-header">
+                        <h3>SQLite Tables Monitor</h3>
+                        <button id="refresh-state-btn" class="btn btn-secondary btn-sm">🔄 Refresh State</button>
+                    </div>
+                    <div class="state-grid">
+                        <!-- Users Table -->
+                        <div class="state-bucket">
+                            <h4>users Table</h4>
+                            <div class="scroll-box" id="users-list">
+                                <div class="empty-state">No users</div>
+                            </div>
+                        </div>
+
+                        <!-- OAuth Clients Table -->
+                        <div class="state-bucket">
+                            <h4>oauth_clients Table</h4>
+                            <div class="scroll-box" id="clients-list">
+                                <div class="empty-state">No clients</div>
+                            </div>
+                        </div>
+
+                        <!-- Auth Codes Table -->
+                        <div class="state-bucket" style="margin-top: 0.5rem; grid-column: span 2;">
+                            <h4>oauth_auth_codes Table</h4>
+                            <div class="scroll-box" id="codes-list" style="max-height: 80px;">
+                                <div class="empty-state">No authorization codes issued</div>
+                            </div>
+                        </div>
+
+                        <!-- Access Tokens Table -->
+                        <div class="state-bucket" style="margin-top: 0.5rem; grid-column: span 2;">
+                            <h4>oauth_access_tokens Table</h4>
+                            <div class="scroll-box" id="tokens-list" style="max-height: 80px;">
+                                <div class="empty-state">No access tokens active</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Client-Server Interactions Logs -->
+                <div class="card network-card flex-grow-1" style="margin-top: 0.75rem;">
+                    <div class="network-header">
+                        <h3>Client-Server Interactions</h3>
+                        <button id="clear-logs-btn" class="btn btn-secondary btn-sm">Clear Transactions</button>
+                    </div>
+                    <div class="network-timeline" id="network-timeline">
+                        <div class="empty-network">No interactions captured yet. Perform an action on the client workspace.</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="/static/app.js?v=oauth-2"></script>
+</body>
+</html>
