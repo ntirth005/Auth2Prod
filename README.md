@@ -354,8 +354,50 @@ The goal is to discover the correct architecture through implementation, experim
 
 ---
 
-## Current Status
+## Implementations Status & Branch Map
 
-Phase 0 — Exploration
+We have successfully engineered, implemented, and documented the core authentication protocols across dedicated Git branches. Below is the mapping of each implementation phase:
 
-Before building production systems, understand the mechanisms that secure them.
+| Phase / Branch | Target Architecture | Key Components & Directory | Status |
+| :--- | :--- | :--- | :--- |
+| **`session`** | API Key & Classic Stateful Auth | HTTP Basic, HTTP Digest, Query/Header API Keys, Stateful SQLite Sessions | **Merged/Complete** |
+| **`jwt`** | Stateless JWT & Rotation | HS256 Token Signatures, Access/Refresh Token Rotation (RTR), Revocation Families | **Merged/Complete** |
+| **`oauth`** | Federated Identity (OAuth 2.0) | Interactive Handshake Sandbox, Real GitHub/Google IDP login (`oauth_profile_app/`) | **Merged/Complete** |
+
+---
+
+## Architectural Analysis & Success Criteria
+
+Through hands-on implementation and benchmarking, we have formulated the following architectural trade-offs to guide production decisions:
+
+### 1. Why Sessions instead of JWT?
+* **Instant Revocation**: If a user logs out, rotates their password, or their account is suspended, the server can instantly delete the session from the backend database (or memory store), terminating access immediately.
+* **Minimal Bandwidth**: A session cookie carries a simple session identifier (e.g., a 32-character string), keeping HTTP headers small.
+* **XSS Immunity**: Session cookies marked with `HttpOnly` cannot be read by browser-side JavaScript, rendering them immune to XSS token theft.
+
+### 2. Why JWT instead of Sessions?
+* **Stateless Verification**: The server verifies tokens mathematically using a secret key without querying a database on every request, reducing authentication latency.
+* **Decoupled Scaling**: Eliminates the need for shared session stores (such as Redis) or sticky sessions across horizontal clusters.
+* **Microservices-Native**: Multiple decentralized services can verify claims independently if they possess the token's signing key.
+
+### 3. Why Refresh Tokens?
+* **Security-Lifetime Trade-off**: Allows access tokens to be extremely short-lived (e.g., 5 minutes) to minimize the window of abuse if stolen, while long-lived refresh tokens (e.g., 30 days) maintain session continuity.
+* **Refresh Token Rotation (RTR)**: Every time a refresh token is used, it is rotated. If a compromised/used refresh token is presented, the server revokes the entire token family to prevent replay attacks.
+
+### 4. When is OAuth 2.0 necessary?
+* **Delegated Access**: When a client application needs to authorize third-party integrations (e.g., fetching a user's Google Calendar) without access to their credentials.
+* **Federated Identity**: Offloading identity management and password hashing to external secure Providers (e.g., "Sign In with Google/GitHub").
+
+### 5. When are API Keys sufficient?
+* **Machine-to-Machine (M2M)**: Server-to-server calls, CLI tools, or developer-facing APIs where user-interactive login is absent.
+* **High-Performance Integrations**: Simple authorization checks with low signing overhead.
+
+### 6. When should RBAC be used?
+* **Role-Based Provisioning**: When permissions are groupable into structural roles (Admin, Editor, Viewer). Scale limit: becomes complex ("role explosion") in setups needing fine-grained attribute-based access (where ABAC is preferred).
+
+### 7. Core Benchmarks Summary
+* **What scales best?** **Stateless JWTs** scale best. No database checks are required to verify the authentication signature.
+* **What is easiest to operate?** **Stateful Sessions** are easiest. Key rotation, client-side XSS mitigation, and token revocation logic are non-issues.
+* **What is most secure?**
+  - *Browsers*: **Session Cookies** (SameSite, HttpOnly, Secure) prevent XSS token theft.
+  - *APIs/Mobile*: **JWT Access + Refresh Tokens** utilizing RTR and secure storage (Keychain/Keystore).
