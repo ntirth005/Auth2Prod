@@ -1,361 +1,103 @@
-# Auth2Prod
+# OAuth 2.0 Playground & Sandbox
 
-> Understanding Authentication & Authorization Systems Through Engineering, Implementation, Benchmarking, and Architectural Analysis.
+> A diagnostic environment for engineering, implementing, and visualizing the OAuth 2.0 Authorization Code Flow.
 
----
-
-## Motivation
-
-While designing **RAG2Prod**, I realized that authentication and authorization are not implementation details—they are architectural decisions.
-
-Modern systems rely on a combination of:
-
-* Session-Based Authentication
-* JWT Authentication
-* Refresh Token Strategies
-* OAuth 2.0 / OpenID Connect
-* API Keys
-* Role-Based Access Control (RBAC)
-
-Most developers learn how to use these mechanisms.
-
-Few understand:
-
-* Why one architecture is chosen over another.
-* How they scale.
-* What security assumptions they make.
-* What operational complexity they introduce.
-* Where they fail.
-
-This repository exists to close that gap.
-
-The objective is not to build another login system.
-
-The objective is to develop enough understanding to make informed architectural decisions when building production systems.
+This playground serves as a fully interactive sandbox simulating the OAuth 2.0 protocol flow between the **Client Application**, the **Authorization Server (Identity Provider)**, and the **Resource Server**, with complete query tracing to an underlying **SQLite Database**.
 
 ---
 
-## The Question
-
-Instead of asking:
-
-> "How do I implement JWT?"
-
-I want to answer:
-
-> "When should JWT be used instead of Sessions?"
-
-Instead of asking:
-
-> "How do I add Google Login?"
-
-I want to answer:
-
-> "What architectural problem does OAuth solve?"
-
-Instead of asking:
-
-> "How do I protect an endpoint?"
-
-I want to answer:
-
-> "What authorization model best fits my system?"
-
-The goal is to understand the trade-offs behind every decision.
-
----
-
-## Project Objectives
-
-### Technical Objectives
-
-* Implement common authentication mechanisms.
-* Implement common authorization mechanisms.
-* Analyze request flows.
-* Compare stateful and stateless architectures.
-* Understand token lifecycle management.
-* Study security vulnerabilities and mitigations.
-* Evaluate scalability characteristics.
-* Measure operational complexity.
-
-### Engineering Objectives
-
-* Build intuition for authentication design.
-* Learn to justify architectural choices.
-* Create a reusable decision framework.
-* Understand production trade-offs.
-* Avoid cargo-cult engineering.
-
----
-
-## Systems To Explore
-
-### 1. Session-Based Authentication
-
-Topics
-
-* Cookies
-* Server-Side Sessions
-* Session Stores
-* Sticky Sessions
-* Session Invalidation
-
-Questions
-
-* Why were sessions the industry standard?
-* What breaks when systems scale horizontally?
-* How do distributed systems manage session state?
-* What are the attack vectors?
-
-Evaluation
-
-* Scalability
-* Security
-* Simplicity
-* Operational Cost
-
----
-
-### 2. JWT Authentication
-
-Topics
-
-* Access Tokens
-* Claims
-* Signature Verification
-* Stateless Authentication
-
-Questions
-
-* Why did JWT become popular?
-* What does statelessness actually provide?
-* What security problems does JWT introduce?
-* When should JWT not be used?
-
-Evaluation
-
-* Scalability
-* Token Size
-* Verification Cost
-* Revocation Complexity
-
----
-
-### 3. Refresh Token Architecture
-
-Topics
-
-* Access Token Rotation
-* Refresh Token Rotation
-* Token Revocation
-* Session Continuity
-
-Questions
-
-* How do modern systems maintain long-lived sessions?
-* How can token theft be mitigated?
-* What happens when refresh tokens are compromised?
-
-Evaluation
-
-* Security
-* User Experience
-* Operational Complexity
-
----
-
-### 4. OAuth 2.0
-
-Topics
-
-* Authorization Code Flow
-* Identity Providers
-* Third-Party Login
-* Consent Management
-
-Questions
-
-* How does Sign In With Google work internally?
-* What problems does OAuth solve?
-* What problems does OAuth not solve?
-* When is OAuth unnecessary?
-
-Evaluation
-
-* Security
-* Complexity
-* Integration Cost
-
----
-
-### 5. API Key Authentication
-
-Topics
-
-* Machine-to-Machine Communication
-* Service Authentication
-* Key Rotation
-* Key Management
-
-Questions
-
-* When should API Keys be preferred over JWT?
-* How should keys be managed securely?
-* What are the limitations?
-
-Evaluation
-
-* Simplicity
-* Security
-* Operational Overhead
-
----
-
-## Authorization Systems
-
-Authentication answers:
-
-> Who are you?
-
-Authorization answers:
-
-> What are you allowed to do?
-
-This repository treats them as separate concerns.
-
-### RBAC
-
-Topics
-
-* Roles
-* Permissions
-* Access Policies
-
-Example
-
-```text
-Admin
-Researcher
-Viewer
+## System Design & Architecture
+
+The following sequence diagram outlines the interactive message exchanges and database interactions executed during the Authorization Code flow:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Browser as "Client Browser (Frontend)"
+    participant Client as "Client Backend (/oauth/callback)"
+    participant AuthServer as "Authorization Server (/api/oauth)"
+    participant DB as "Database (SQLite)"
+    participant ResourceServer as "Resource Server (/api)"
+
+    User->>Browser: Click "Initiate Authorization Flow"
+    Browser->>AuthServer: GET /api/oauth/authorize?client_id=...&redirect_uri=...&scope=...&state=...
+    Note over AuthServer: Validates client_id & redirect_uri
+    AuthServer->>User: Display Consent Dialog & Login Prompt
+    User->>AuthServer: Approve Consent (Username & Password)
+    AuthServer->>DB: INSERT INTO oauth_auth_codes (code, client_id, user_id, expires_at)
+    AuthServer->>Browser: Redirect 302 to Client Redirect URI with code & state
+    Browser->>Client: Extract parameters from URL (Simulated Callback)
+    Browser->>AuthServer: POST /api/oauth/token (code, client_id, client_secret)
+    AuthServer->>DB: SELECT * FROM oauth_auth_codes WHERE code=...
+    AuthServer->>DB: UPDATE oauth_auth_codes SET is_used=True
+    AuthServer->>DB: INSERT INTO oauth_access_tokens (token, user_id, expires_at)
+    AuthServer-->>Browser: JSON: {access_token, id_token, token_type, expires_in}
+    Browser->>ResourceServer: GET /api/resource (Authorization: Bearer <access_token>)
+    ResourceServer->>DB: Validate Token signature & revocation status
+    ResourceServer-->>Browser: Return sensitive mock resource payload
 ```
 
-Questions
+---
 
-* How should permissions be modeled?
-* How does RBAC scale?
-* What are its limitations?
+## Folder Structure
+
+* [main.py](file:///home/ntirth005/Documents/Auth2Prod/src/main.py): Sets up the FastAPI app, manages database seeders, and routes HTTP requests.
+* [models.py](file:///home/ntirth005/Documents/Auth2Prod/src/models.py): Defines tables for `User`, `OAuthClient`, `OAuthAuthCode`, and `OAuthAccessToken`.
+* [database.py](file:///home/ntirth005/Documents/Auth2Prod/src/database.py): Exposes the SQLite engine and local DB session wrapper.
+* [security.py](file:///home/ntirth005/Documents/Auth2Prod/src/security.py): Password hashing (PBKDF2) and stateless JWT signing/decoding utilities.
+* [auth/oauth.py](file:///home/ntirth005/Documents/Auth2Prod/src/auth/oauth.py): Houses the API endpoint controllers and query tracking logger.
+* [static/index.html](file:///home/ntirth005/Documents/Auth2Prod/src/static/index.html): HTML dashboard structure.
+* [static/app.js](file:///home/ntirth005/Documents/Auth2Prod/src/static/app.js): Drives the flow client-side, parses tokens, and prints live logs.
+* [static/style.css](file:///home/ntirth005/Documents/Auth2Prod/src/static/style.css): Dark theme UI styling matching the JWT Sandbox.
 
 ---
 
-## Comparison Dimensions
+## The 5-Step Flow Details
 
-Every implementation will be evaluated using the same framework.
-
-### Security
-
-* Replay Attacks
-* Session Hijacking
-* Token Theft
-* CSRF
-* XSS Exposure
-* Privilege Escalation
-
-### Scalability
-
-* Horizontal Scaling
-* Distributed Systems Compatibility
-* Microservice Compatibility
-
-### Performance
-
-* Authentication Latency
-* Verification Cost
-* Memory Consumption
-* Database Dependency
-
-### Operations
-
-* Deployment Complexity
-* Rotation Strategy
-* Revocation Strategy
-* Monitoring Requirements
-
-### Developer Experience
-
-* Ease of Integration
-* Maintainability
-* Debugging Complexity
+1. **Step 1: Initiate Auth Request (`GET /api/oauth/authorize`)**
+   - Configures the client metadata: `client_id`, `redirect_uri`, `scope`, and `state`.
+   - Sends a validation request to verify the client exists in the SQLite database.
+2. **Step 2: User Consent & Login (`POST /api/oauth/consent`)**
+   - Prompts the user for resource owner credentials and displays the scopes requested.
+   - Upon credentials verification and approval, writes a short-lived authorization code to the DB.
+3. **Step 3: Capture Callback Code**
+   - Parses parameters from the simulated redirect and displays the captured code and state values.
+4. **Step 4: Token Exchange (`POST /api/oauth/token`)**
+   - Sends a backend token exchange request including the authorization code and client secret.
+   - Marks the code as used in the database to prevent replay attacks, issues stateless signed JWT Access and ID tokens, and saves token records to SQLite.
+5. **Step 5: Resource Server Queries (`GET /api/resource` & `GET /api/oauth/userinfo`)**
+   - Queries protected resource servers using the bearer Access Token.
+   - Resource servers statically check the JWT signature and query the DB to verify the token has not been revoked.
 
 ---
 
-## Expected Deliverables
+## Resolved Challenges during Implementation
 
-Each implementation should include:
+* **Console Log Loss on Redirect**: Standard OAuth 2.0 flows redirect the client browser back to the redirect URI, which reloads the page and wipes any browser console or network console timeline.
+  - *Resolution*: We simulated the 302 redirect by intercepting the consent response, updating the browser URL bar inline using the HTML5 `history.pushState` API, and updating the state machine programmatically. This preserves the visual timeline log card history perfectly.
+* **Out-of-the-box Preseeding**: Manually setting up test users and client applications slows down diagnostic exploration.
+  - *Resolution*: Registered a FastAPI `startup` event listener that automatically checks and seeds a default test user (`alice` / `password123`) and a default registered OAuth Client (`mock-client-123` / `mock-client-secret-999`) on server boot.
+* **Bcrypt / Passlib Version Mismatch**: Modern `bcrypt` versions (4.1.0+) combined with the unmaintained `passlib` package trigger a `ValueError` (password cannot be longer than 72 bytes) and `AttributeError` on start.
+  - *Resolution*: Switched the hashing algorithm in `src/security.py` from `bcrypt` to `pbkdf2_sha256` which is natively supported by Python and does not rely on the faulty passlib-bcrypt backend glue code.
 
-* Architecture Diagram
-* Authentication Flow
-* Authorization Flow
-* Threat Analysis
-* Security Considerations
-* Performance Observations
-* Advantages
-* Disadvantages
-* Recommended Use Cases
+## Implementations Available
 
----
+This repository houses two distinct implementations demonstrating the OAuth 2.0 Authorization Code flow:
 
-## Success Criteria
+### 1. Interactive Simulated Sandbox (`src/`)
+- An educational playground simulating the handshake protocol (Authorization Server, Client, and Resource Server) to visualize step-by-step state mutations, JWT tokens, and database writes without registering credentials.
+- **Run**:
+  ```bash
+  uv run uvicorn src.main:app --reload --port 8000
+  ```
+- **Access**: Open `http://localhost:8000/static/index.html`
 
-At the conclusion of this project, I should be able to justify answers to questions such as:
-
-* Why Sessions instead of JWT?
-* Why JWT instead of Sessions?
-* Why Refresh Tokens?
-* When is OAuth necessary?
-* When are API Keys sufficient?
-* When should RBAC be used?
-* What scales best?
-* What is easiest to operate?
-* What is most secure for a given context?
-
-The objective is not to memorize technologies.
-
-The objective is to develop engineering judgment.
-
----
-
-## Relationship To RAG2Prod
-
-This repository exists because security architecture decisions should not be based on trends.
-
-The findings from Auth2Prod will directly influence the authentication and authorization architecture of RAG2Prod.
-
-Target Outcome:
-
-```text
-Authentication:
-JWT + Refresh Tokens
-
-Authorization:
-RBAC
-
-External Identity:
-OAuth2 (Future)
-
-Service Authentication:
-API Keys (Future)
-```
-
-The final decision may change.
-
-That is the purpose of this repository.
-
-The goal is to discover the correct architecture through implementation, experimentation, and analysis.
-
----
-
-## Current Status
-
-Phase 0 — Exploration
-
-Before building production systems, understand the mechanisms that secure them.
+### 2. Production-Grade Third-Party OAuth Identity App (`oauth_profile_app/`)
+- Integrates with live, real-world Identity Providers (**GitHub** and **Google**) to authenticate users, map remote identities to local database profiles, and manage sessions statefully via HttpOnly JWT session cookies.
+- For complete registration guides (both are **free**) and solutions to common redirect-state errors, see the dedicated [oauth_profile_app/README.md](file:///home/ntirth005/Documents/Auth2Prod/oauth_profile_app/README.md).
+- **Run**:
+  ```bash
+  uv run uvicorn oauth_profile_app.main:app --reload --port 8000
+  ```
+- **Access**: Open `http://localhost:8000/static/index.html`
