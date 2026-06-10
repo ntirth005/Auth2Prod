@@ -101,3 +101,15 @@ This repository houses two distinct implementations demonstrating the OAuth 2.0 
   uv run uvicorn oauth_profile_app.main:app --reload --port 8000
   ```
 - **Access**: Open `http://localhost:8000/static/index.html`
+
+---
+
+## Git Commit Conventions
+
+This repository follows the **Conventional Commits** specification to keep the git history clean, structured, and easy to parse:
+
+* **`feat` (Feature)**: Introducing new user-facing capabilities, routes, or modules (e.g., creating the third-party OAuth app structure).
+* **`chore` (Routine Tasks)**: Maintenance operations such as updating dependencies (`pyproject.toml`), lockfiles (`uv.lock`), or configuring system parameters.
+* **`fix` (Bug Fixes)**: Resolving validation issues, cookie path boundaries, or framework quirks.
+* **`docs` (Documentation)**: Modifying or creating files containing instructional details (like `README.md`).
+* **`refactor` (Refactoring)**: Cleanups or adjustments to code structure that do not change external logic or fix bugs.
