@@ -362,7 +362,7 @@ We have successfully engineered, implemented, and documented the core authentica
 | :--- | :--- | :--- | :--- |
 | **`session`** | API Key & Classic Stateful Auth | HTTP Basic, HTTP Digest, Query/Header API Keys, Stateful SQLite Sessions | **Merged/Complete** |
 | **`jwt`** | Stateless JWT & Rotation | HS256 Token Signatures, Access/Refresh Token Rotation (RTR), Revocation Families | **Merged/Complete** |
-| **`oauth`** | Federated Identity (OAuth 2.0) | Interactive Handshake Sandbox, Real GitHub/Google IDP login (`oauth_profile_app/`) | **Merged/Complete** |
+| **`oauth`** | Federated Identity (OAuth 2.0) | Interactive Handshake Sandbox, Real GitHub, Google, Microsoft, and Discord IDP login (`oauth_profile_app/`) | **Merged/Complete** |
 
 ---
 
@@ -386,7 +386,7 @@ Through hands-on implementation and benchmarking, we have formulated the followi
 
 ### 4. When is OAuth 2.0 necessary?
 * **Delegated Access**: When a client application needs to authorize third-party integrations (e.g., fetching a user's Google Calendar) without access to their credentials.
-* **Federated Identity**: Offloading identity management and password hashing to external secure Providers (e.g., "Sign In with Google/GitHub").
+* **Federated Identity**: Offloading identity management and password hashing to external secure Providers (e.g., "Sign In with Google/GitHub/Microsoft/Discord").
 
 ### 5. When are API Keys sufficient?
 * **Machine-to-Machine (M2M)**: Server-to-server calls, CLI tools, or developer-facing APIs where user-interactive login is absent.
