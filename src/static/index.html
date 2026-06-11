@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stateless JWT RBAC Visualizer & Guard Simulator</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <span class="logo-icon">🔬</span>
+                <h1>JWT RBAC Visualizer <span class="logo-sub">Stateless Guard Simulator</span></h1>
+            </div>
+            <div class="header-actions">
+                <button id="reset-workspace-btn" class="btn btn-secondary btn-sm">Reset Sandbox</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            
+            <!-- Left Side: Token Factory & Tamper Station -->
+            <section class="panel client-panel">
+                <div class="panel-header">
+                    <h2>🖥️ Token Factory & Tamper Box</h2>
+                    <span class="badge badge-client">Factory</span>
+                </div>
+
+                <!-- Step 1: Claim Creator -->
+                <div class="card">
+                    <h3>1. Customize JWT Claims</h3>
+                    <p class="card-desc">Configure the token's payload. Role and permission claims will be encoded directly into the stateless token.</p>
+                    <form id="generate-form" class="form-grid">
+                        <div class="input-group">
+                            <label for="claim-sub">Subject (User ID / `sub`)</label>
+                            <input type="text" id="claim-sub" value="usr_928" placeholder="e.g. usr_928" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="claim-username">Username (`username`)</label>
+                            <input type="text" id="claim-username" value="charlie" placeholder="e.g. charlie" required>
+                        </div>
+                        
+                        <!-- Roles Tag Input -->
+                        <div class="input-group">
+                            <label for="roles-input">Roles (Press Enter to add tag)</label>
+                            <div class="tags-input-container" id="roles-tags-container">
+                                <!-- Tags will be dynamically rendered here -->
+                                <input type="text" id="roles-tag-input" placeholder="e.g. Admin, Moderator, User">
+                            </div>
+                        </div>
+
+                        <!-- Permissions Checkboxes & Custom Tags -->
+                        <div class="input-group">
+                            <label>Permissions (Select standard and/or type custom below)</label>
+                            <div class="checkbox-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.8rem;">
+                                <label style="display: flex; align-items: center; gap: 0.25rem; color: var(--text-main); cursor: pointer;">
+                                    <input type="checkbox" id="perm-read" value="profile:read" checked style="cursor: pointer;"> profile:read
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.25rem; color: var(--text-main); cursor: pointer;">
+                                    <input type="checkbox" id="perm-edit" value="profile:edit" style="cursor: pointer;"> profile:edit
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.25rem; color: var(--text-main); cursor: pointer;">
+                                    <input type="checkbox" id="perm-delete" value="system:delete" style="cursor: pointer;"> system:delete
+                                </label>
+                            </div>
+                            <div class="tags-input-container" id="permissions-tags-container">
+                                <!-- Custom Permission Tags will render here -->
+                                <input type="text" id="permissions-tag-input" placeholder="Type custom permission & hit Enter">
+                            </div>
+                        </div>
+
+                        <!-- Configuration: Key, Alg, Expiry -->
+                        <div class="grid-2-col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="input-group">
+                                <label for="claim-expiry">Expiry Limit (Minutes)</label>
+                                <input type="number" id="claim-expiry" value="15" min="1" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="signing-alg">Signature Algorithm (`alg`)</label>
+                                <select id="signing-alg">
+                                    <option value="HS256">HMAC + SHA-256 (HS256)</option>
+                                    <option value="HS384">HMAC + SHA-384 (HS384)</option>
+                                    <option value="HS512">HMAC + SHA-512 (HS512)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="signing-secret">Symmetric Signing Key (Secret)</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="signing-secret" value="super-secret-key-share-between-services-987" style="flex-grow: 1;" placeholder="symmetric key" required>
+                                <button type="button" id="btn-rotate-secret" class="btn btn-secondary btn-sm" title="Generate Random Secret">🎲</button>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full">Generate & Sign Token</button>
+                    </form>
+                </div>
+
+                <!-- Colored Segment Map -->
+                <div class="card" style="margin-top: 1rem;">
+                    <h3>2. Colored JWT Segment Map</h3>
+                    <p class="card-desc">Decoded segments are base64url encoded. Structure: <code>Header</code> (Red) . <code>Payload</code> (Purple) . <code>Signature</code> (Blue)</p>
+                    
+                    <div class="jwt-segmented-box" id="jwt-segmented-box" style="background: rgba(0, 0, 0, 0.4); padding: 0.75rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.4; border: 1px solid var(--border-card);">
+                        <span class="empty-state-text" style="color: var(--text-dark); font-style: italic;">Generate a token to visualize segments</span>
+                    </div>
+
+                    <hr class="divider">
+
+                    <h3>3. Tampering Sandbox</h3>
+                    <p class="card-desc">Simulate tampering by altering token characters (e.g. changing signature letters) or editing the payload segments.</p>
+                    <div class="input-group">
+                        <textarea id="tamper-token-area" rows="4" class="code-textarea" style="width: 100%; font-family: var(--font-mono); font-size: 0.8rem; background-color: rgba(13, 21, 39, 0.8); border: 1px solid var(--border-card); border-radius: 8px; color: var(--text-main); padding: 0.55rem 0.75rem; resize: vertical; outline: none;" placeholder="Paste or modify JWT here..."></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Side: Server Guard Simulator & Logs -->
+            <section class="panel server-panel">
+                <div class="panel-header">
+                    <h2>⚙️ Server Authorization Guard Simulator</h2>
+                    <span class="badge badge-server">Gateway</span>
+                </div>
+
+                <!-- Guard Settings -->
+                <div class="card state-card" style="resize: none; min-height: auto; max-height: none;">
+                    <h3>Simulated API Route Guard Settings</h3>
+                    <p class="card-desc">Configure route policies and validation keys. The server will decrypt and evaluate the current token against these rules.</p>
+                    
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="route-preset">Guard Presets (Auto-fill settings)</label>
+                            <select id="route-preset">
+                                <option value="custom">-- Custom Route Guard Configuration --</option>
+                                <option value="profile-read">GET /api/v1/profile (Requires permission: profile:read)</option>
+                                <option value="profile-edit">POST /api/v1/profile (Requires permission: profile:edit)</option>
+                                <option value="system-delete">DELETE /api/v1/system (Requires permission: system:delete)</option>
+                                <option value="admin-only">POST /api/v1/admin/dashboard (Requires role: Admin)</option>
+                                <option value="moderator-only">GET /api/v1/reports (Requires role: Moderator)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="grid-2-col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="input-group">
+                                <label for="guard-role">Required Role (leave blank for none)</label>
+                                <input type="text" id="guard-role" placeholder="e.g. Admin">
+                            </div>
+                            <div class="input-group">
+                                <label for="guard-permission">Required Permission (leave blank for none)</label>
+                                <input type="text" id="guard-permission" value="profile:read" placeholder="e.g. profile:read">
+                            </div>
+                        </div>
+
+                        <div class="grid-2-col" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 0.75rem;">
+                            <div class="input-group">
+                                <label for="verify-secret">Expected Cryptographic Secret Key</label>
+                                <input type="text" id="verify-secret" value="super-secret-key-share-between-services-987" placeholder="symmetric secret">
+                            </div>
+                            <div class="input-group">
+                                <label for="verify-alg">Expected Algorithm</label>
+                                <select id="verify-alg">
+                                    <option value="HS256">HS256</option>
+                                    <option value="HS384">HS384</option>
+                                    <option value="HS512">HS512</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button id="btn-evaluate-submit" class="btn btn-success btn-full">Submit Token to Route Guard</button>
+                    </div>
+                </div>
+
+                <!-- Guard Check Visualizer -->
+                <div class="card" style="margin-top: 1rem; flex-shrink: 0; display: flex; flex-direction: column; max-height: 290px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-shrink: 0;">
+                        <h3>Stateless Gateway Check Path</h3>
+                        <span id="gateway-overall-badge" class="badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid var(--border-card);">Awaiting Token</span>
+                    </div>
+                    
+                    <div class="guard-steps-container" id="guard-steps-container" style="display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; flex-grow: 1; padding-right: 4px;">
+                        <!-- Step 1 -->
+                        <div class="guard-step-box" data-step="1" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-card); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span class="step-indicator" style="font-size: 1.25rem;">⚪</span>
+                                <div>
+                                    <strong style="font-size: 0.85rem; display: block;">Step 1: Parse Structure</strong>
+                                    <span class="step-message" style="font-size: 0.725rem; color: var(--text-muted);">Decodes Base64Url segments and parses Header/Payload.</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm step-detail-toggle hidden" style="padding: 2px 6px; font-size: 0.65rem;">View</button>
+                        </div>
+                        <div class="step-detail-box hidden" id="step-detail-1" style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-card); border-top: none; border-radius: 0 0 8px 8px; padding: 0.5rem; margin-top: -0.5rem; font-family: var(--font-mono); font-size: 0.7rem; white-space: pre-wrap; word-break: break-all; color: var(--text-muted);"></div>
+
+                        <!-- Step 2 -->
+                        <div class="guard-step-box" data-step="2" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-card); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span class="step-indicator" style="font-size: 1.25rem;">⚪</span>
+                                <div>
+                                    <strong style="font-size: 0.85rem; display: block;">Step 2: Verify Signature</strong>
+                                    <span class="step-message" style="font-size: 0.725rem; color: var(--text-muted);">Validates cryptographic signature matches expectations.</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm step-detail-toggle hidden" style="padding: 2px 6px; font-size: 0.65rem;">View</button>
+                        </div>
+                        <div class="step-detail-box hidden" id="step-detail-2" style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-card); border-top: none; border-radius: 0 0 8px 8px; padding: 0.5rem; margin-top: -0.5rem; font-family: var(--font-mono); font-size: 0.7rem; white-space: pre-wrap; word-break: break-all; color: var(--text-muted);"></div>
+
+                        <!-- Step 3 -->
+                        <div class="guard-step-box" data-step="3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-card); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span class="step-indicator" style="font-size: 1.25rem;">⚪</span>
+                                <div>
+                                    <strong style="font-size: 0.85rem; display: block;">Step 3: Expiry Check</strong>
+                                    <span class="step-message" style="font-size: 0.725rem; color: var(--text-muted);">Validates timestamp coordinates (checks if `exp` is active).</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm step-detail-toggle hidden" style="padding: 2px 6px; font-size: 0.65rem;">View</button>
+                        </div>
+                        <div class="step-detail-box hidden" id="step-detail-3" style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-card); border-top: none; border-radius: 0 0 8px 8px; padding: 0.5rem; margin-top: -0.5rem; font-family: var(--font-mono); font-size: 0.7rem; white-space: pre-wrap; word-break: break-all; color: var(--text-muted);"></div>
+
+                        <!-- Step 4 -->
+                        <div class="guard-step-box" data-step="4" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-card); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span class="step-indicator" style="font-size: 1.25rem;">⚪</span>
+                                <div>
+                                    <strong style="font-size: 0.85rem; display: block;">Step 4: Claim Check</strong>
+                                    <span class="step-message" style="font-size: 0.725rem; color: var(--text-muted);">Verifies required role and permission keys in claims payload.</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm step-detail-toggle hidden" style="padding: 2px 6px; font-size: 0.65rem;">View</button>
+                        </div>
+                        <div class="step-detail-box hidden" id="step-detail-4" style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-card); border-top: none; border-radius: 0 0 8px 8px; padding: 0.5rem; margin-top: -0.5rem; font-family: var(--font-mono); font-size: 0.7rem; white-space: pre-wrap; word-break: break-all; color: var(--text-muted);"></div>
+                    </div>
+                </div>
+
+                <!-- Network Log Console -->
+                <div class="card network-card" style="margin-top: 1rem;">
+                    <div class="network-header">
+                        <h3>Traffic Transmission Logs</h3>
+                        <button id="clear-logs-btn" class="btn btn-secondary btn-sm">Clear Logs</button>
+                    </div>
+
+                    <div class="network-timeline" id="network-timeline">
+                        <div class="empty-network">No traffic requests captured. Generate and evaluate a token to monitor transmissions.</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
