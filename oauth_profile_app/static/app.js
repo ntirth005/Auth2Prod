@@ -53,7 +53,7 @@ async function fetchProfile() {
 
         if (response.ok) {
             currentUser = data;
-            
+
             // Toggle view visibility
             authContainer.classList.add("hidden");
             profileContainer.classList.remove("hidden");
@@ -62,7 +62,7 @@ async function fetchProfile() {
             greetName.textContent = currentUser.display_name || currentUser.username;
             greetUsername.textContent = `@${currentUser.username}`;
             userAvatar.src = currentUser.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150";
-            
+
             profileDisplayName.value = currentUser.display_name || "";
             profileEmail.value = currentUser.email || "";
             profileBio.value = currentUser.bio || "";
@@ -72,11 +72,12 @@ async function fetchProfile() {
             sessionStatusBadge.className = "hud-status status-green";
             sessionProfileBadge.textContent = `@${currentUser.username}`;
             sessionProfileBadge.className = "hud-status status-green";
-            
+
             let provider = "Local";
             if (currentUser.github_id) provider = "GitHub";
             else if (currentUser.google_id) provider = "Google";
-            
+            else if (currentUser.microsoft_id) provider = "Microsoft";
+
             sessionProviderVal.textContent = provider;
             sessionEmailVal.textContent = currentUser.email || "None";
 

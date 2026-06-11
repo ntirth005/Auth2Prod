@@ -103,7 +103,9 @@ Follow these step-by-step terminal instructions to initialize and populate your 
 
 ---
 
-## Troubleshooting: "Invalid state parameter. CSRF validation failed"
+## Troubleshooting: Common Errors
+
+### A. "Invalid state parameter. CSRF validation failed"
 
 If you encounter this error during callback redirects:
 
@@ -111,6 +113,12 @@ If you encounter this error during callback redirects:
    - **Solution**: Access the application exclusively at **`http://localhost:8000/`** (matching the Redirect URI host).
 2. **Expired Cookie**: The anti-CSRF state cookie has a lifespan of 5 minutes.
    - **Solution**: Re-initiate the flow.
+
+### B. "Failed to retrieve user info from Microsoft: 403 - UnknownError"
+
+If you encounter this error during the Microsoft login callback:
+- **Missing API Scopes**: Calling the Microsoft Graph API `/v1.0/me` requires permission scopes like `User.Read`. If the application only requests basic authentication scopes (`openid profile email`) without `User.Read`, Microsoft Graph will deny access to the user details resource.
+  - **Solution**: Ensure the authorization request URL includes `User.Read` in the `scope` parameter (e.g., `scope=openid profile email User.Read`).
 
 
 ---

@@ -17,6 +17,7 @@
     --color-success: #10b981;
     --color-danger: #ef4444;
     --color-warning: #f59e0b;
+    --color-info: #00a4ef;
 
     --text-main: #f1f5f9;
     --text-muted: #94a3b8;
@@ -323,6 +324,17 @@ body {
     box-shadow: 0 0 15px rgba(245, 158, 11, 0.25);
     transform: translateY(-1px);
 }
+
+.btn-info {
+    background-color: var(--color-info);
+    color: white;
+}
+.btn-info:hover {
+    background-color: #0084c2;
+    box-shadow: 0 0 15px rgba(0, 164, 239, 0.25);
+    transform: translateY(-1px);
+}
+
 
 .btn-sm {
     padding: 0.3rem 0.6rem;

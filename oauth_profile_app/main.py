@@ -39,7 +39,7 @@ def get_debug_state(db: Session = Depends(get_db)):
                 "display_name": u.display_name,
                 "email": u.email,
                 "avatar_url": u.avatar_url,
-                "provider": "GitHub" if u.github_id else ("Google" if u.google_id else "Local")
+                "provider": "GitHub" if u.github_id else ("Google" if u.google_id else ("Microsoft" if u.microsoft_id else ("Discord" if u.discord_id else "Local")))
             } for u in users
         ]
     }

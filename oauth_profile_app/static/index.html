@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,9 +8,12 @@
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=oauth-profile-1">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=oauth-profile-2">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Header -->
@@ -25,30 +29,59 @@
 
         <!-- Main Workspace Grid -->
         <main class="workspace">
-            
+
             <!-- Left Panel: User Dashboard / Identity Login -->
             <section class="panel client-panel">
-                
+
                 <!-- Anonymous State: OAuth Login Options -->
                 <div id="auth-container" class="auth-box">
                     <h3>Sign In to Sandbox</h3>
-                    <p class="auth-desc">Authenticate securely via industry-standard third-party identity providers. The server creates a local database profile linked to your remote identity.</p>
-                    
+                    <p class="auth-desc">Authenticate securely via industry-standard third-party identity providers. The
+                        server creates a local database profile linked to your remote identity.</p>
+
                     <div class="form-grid" style="margin-top: 0.5rem;">
-                        <a href="/api/auth/github/login" class="btn btn-primary btn-full" style="text-decoration: none; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            🐱 Sign In with GitHub
+                        <a href="/api/auth/github/login" class="btn btn-primary btn-full"
+                            style="text-decoration: none; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            Sign In with GitHub
                         </a>
-                        <a href="/api/auth/google/login" class="btn btn-warning btn-full" style="text-decoration: none; gap: 0.5rem;">
-                            🌐 Sign In with Google
+                        <a href="/api/auth/google/login" class="btn btn-warning btn-full"
+                            style="text-decoration: none; gap: 0.5rem;">
+                            Sign In with Google
+                        </a>
+                        <a href="/api/auth/microsoft/login" class="btn btn-info btn-full"
+                            style="text-decoration: none; gap: 0.5rem;">
+                            Sign In with Microsoft
+                        </a>
+                        <a href="/api/auth/discord/login" class="btn btn-full"
+                            style="text-decoration: none; gap: 0.5rem; margin-top: 0.5rem; background-color: #5865F2; color: white; border: none; display: flex; align-items: center; justify-content: center;">
+                            Sign In with Discord
                         </a>
                     </div>
 
-                    <div class="card instruction-card" style="margin-top: 1.5rem; border-color: rgba(99, 102, 241, 0.2);">
+                    <div class="card instruction-card"
+                        style="margin-top: 1.5rem; border-color: rgba(99, 102, 241, 0.2);">
                         <h4>🛠️ Developer Integration Guide</h4>
-                        <p class="card-desc" style="margin-bottom: 0.5rem; font-size: 0.75rem;">To test the login flow, you must register OAuth applications and configure credentials in a local <code>.env</code> file:</p>
-                        <ul style="font-size: 0.725rem; color: var(--text-muted); padding-left: 1rem; line-height: 1.4;">
-                            <li style="margin-bottom: 0.35rem;"><strong>GitHub</strong>: Go to GitHub ➡️ Developer Settings ➡️ OAuth Apps. Set callback URL to <code>http://localhost:8000/api/auth/github/callback</code>.</li>
-                            <li><strong>Google</strong>: Go to Google Cloud Console ➡️ Credentials ➡️ Create OAuth Client ID. Set redirect URI to <code>http://localhost:8000/api/auth/google/callback</code>.</li>
+                        <p class="card-desc" style="margin-bottom: 0.5rem; font-size: 0.75rem;">To test the login flow,
+                            you must register OAuth applications and configure credentials in a local <code>.env</code>
+                            file:</p>
+                        <ul
+                            style="font-size: 0.725rem; color: var(--text-muted); padding-left: 1rem; line-height: 1.4;">
+                            <li style="margin-bottom: 0.35rem;"><strong>GitHub</strong>: Go to GitHub ➡️ Developer
+                                Settings ➡️ OAuth Apps. Set callback URL to
+                                <code>http://localhost:8000/api/auth/github/callback</code>.
+                            </li>
+                            <li><strong>Google</strong>: Go to Google Cloud Console ➡️ Credentials ➡️ Create OAuth
+                                Client ID. Set redirect URI to
+                                <code>http://localhost:8000/api/auth/google/callback</code>.
+                            </li>
+                            <li><strong>Microsoft</strong>: Go to Microsoft Entra Admin Center ➡️ App registrations ➡️
+                                New registration. Set redirect URI to
+                                <code>http://localhost:8000/api/auth/microsoft/callback</code>.
+                            </li>
+                            <li><strong>Discord</strong>: Go to Discord Developer Portal ➡️ Applications ➡️ Create App.
+                                Set redirect URI to
+                                <code>http://localhost:8000/api/auth/discord/callback</code>.
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -56,7 +89,8 @@
                 <!-- Authenticated State: User Profile Settings -->
                 <div id="profile-container" class="profile-box hidden">
                     <div class="profile-header-card">
-                        <img id="user-avatar" class="avatar-ring" src="" alt="Avatar" style="object-fit: cover; width: 60px; height: 60px; border-radius: 50%;">
+                        <img id="user-avatar" class="avatar-ring" src="" alt="Avatar"
+                            style="object-fit: cover; width: 60px; height: 60px; border-radius: 50%;">
                         <div>
                             <h2 id="greet-name">Hello, User</h2>
                             <p id="greet-username">@username</p>
@@ -67,7 +101,8 @@
                     <!-- Profile Edit Form -->
                     <div class="card form-card">
                         <h3>Modify Profile Fields</h3>
-                        <p class="card-desc">Your changes will be saved to the local database profile. Third-party provider handles credentials and login verification.</p>
+                        <p class="card-desc">Your changes will be saved to the local database profile. Third-party
+                            provider handles credentials and login verification.</p>
                         <form id="profile-update-form" class="form-grid">
                             <div class="input-group">
                                 <label for="profile-display-name">Display Name</label>
@@ -97,7 +132,8 @@
                 <!-- Client-Side OAuth Session HUD -->
                 <div class="card state-card flex-shrink-0">
                     <h3>Client-Side Session HUD</h3>
-                    <p class="card-desc">Shows status of active session cookies, remote provider identifiers, and local account records.</p>
+                    <p class="card-desc">Shows status of active session cookies, remote provider identifiers, and local
+                        account records.</p>
                     <div class="jwt-hud-grid">
                         <div class="hud-row">
                             <strong>Login Status:</strong>
@@ -109,11 +145,13 @@
                         </div>
                         <div class="hud-row">
                             <strong>Identity Provider:</strong>
-                            <code id="session-provider-val" class="break-word text-sm" style="font-family: var(--font-mono); font-size: 0.75rem;">None</code>
+                            <code id="session-provider-val" class="break-word text-sm"
+                                style="font-family: var(--font-mono); font-size: 0.75rem;">None</code>
                         </div>
                         <div class="hud-row">
                             <strong>Email Address:</strong>
-                            <code id="session-email-val" class="break-word text-sm" style="font-family: var(--font-mono); font-size: 0.75rem;">None</code>
+                            <code id="session-email-val" class="break-word text-sm"
+                                style="font-family: var(--font-mono); font-size: 0.75rem;">None</code>
                         </div>
                     </div>
                 </div>
@@ -142,12 +180,14 @@
                         <button id="clear-logs-btn" class="btn btn-secondary btn-sm">Clear Transactions</button>
                     </div>
                     <div class="network-timeline" id="network-timeline">
-                        <div class="empty-network">No interactions captured yet. Perform an action on the client workspace.</div>
+                        <div class="empty-network">No interactions captured yet. Perform an action on the client
+                            workspace.</div>
                     </div>
                 </div>
             </section>
         </main>
     </div>
-    <script src="/static/app.js?v=oauth-profile-1"></script>
+    <script src="/static/app.js?v=oauth-profile-2"></script>
 </body>
+
 </html>
